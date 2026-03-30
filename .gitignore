@@ -1,0 +1,27 @@
+# Servidor de teste local (não necessário em produção)
+test_server.py
+
+# Backups e versões antigas
+index250911.html
+index250923.html
+index251030.html
+index_0821.html
+index_250825.html
+index_250831.html
+index_melhorado_numeracao.html
+index_teste.html
+index_teste_numeracao.html
+indexNotam.html
+index_melhorado_numeracao.html
+monitoramento_relatorio1.html
+relatorio_monitoramento.html
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+*.swp
+*.swo

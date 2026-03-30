@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Fiscal</title>
+    <!-- Tailwind via CDN por praticidade -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Tailwind slate-900 */
+            color: #f8fafc; /* Tailwind slate-50 */
+            touch-action: manipulation;
+        }
+
+        .btn-action {
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+
+        .btn-action:active {
+            transform: scale(0.95);
+        }
+        
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
+    
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyBJwvh4kJ1XCsU6fQriJh6d4gxoQrkM5kk",
+          authDomain: "movimento-pista.firebaseapp.com",
+          databaseURL: "https://movimento-pista-default-rtdb.firebaseio.com",
+          projectId: "movimento-pista",
+          storageBucket: "movimento-pista.firebasestorage.app",
+          messagingSenderId: "272997617852",
+          appId: "1:272997617852:web:ce5f4d9165d8337a9ec0b9"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+    </script>
+    
+    <div class="w-full max-w-md bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-700 text-center">
+        <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 mb-2">
+            Módulo Fiscal
+        </h1>
+        <p class="text-slate-400 mb-8 font-medium">Controle de acesso à pista</p>
+
+        <div class="mb-6">
+            <label for="select-quem" class="block text-left text-sm font-medium text-slate-300 mb-2">Quem está ingressando?</label>
+            <select id="select-quem" class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="VIATURA">Viatura Padrão</option>
+                <option value="ELETRICA">Elétrica</option>
+                <option value="FAISCA1">Faísca 1</option>
+                <option value="FAISCA2">Faísca 2</option>
+                <option value="FAISCA3">Faísca 3</option>
+                <option value="MANUTENCAO1">Manutenção 1</option>
+                <option value="MANUTENÇÃO2">Manutenção 2</option>
+                <option value="PCM">PCM</option>
+                <option value="VM1">VM1</option>
+                <option value="VO1">VO1</option>
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-6">
+            <button id="btn-ocupar" class="btn-action w-full py-6 bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white rounded-xl font-bold text-2xl shadow-lg flex flex-col items-center justify-center gap-2">
+                <i class="fas fa-exclamation-triangle text-4xl"></i>
+                <div class="flex items-center gap-2">
+                    <span id="text-ocupar">Entrar na Pista</span>
+                    <div id="loader-ocupar" class="loader"></div>
+                </div>
+            </button>
+
+            <button id="btn-livrar" class="btn-action w-full py-6 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-xl font-bold text-2xl shadow-lg flex flex-col items-center justify-center gap-2">
+                <i class="fas fa-check-circle text-4xl"></i>
+                <div class="flex items-center gap-2">
+                    <span id="text-livrar">Pista Livre</span>
+                    <div id="loader-livrar" class="loader"></div>
+                </div>
+            </button>
+        </div>
+
+        <div id="feedback" class="mt-8 font-semibold text-lg opacity-0 transition-opacity duration-300">
+            Aguardando comando...
+        </div>
+    </div>
+
+    <!-- Scripts da Lógica e de Animação de Feedback -->
+    <script>
+        const btnOcupar = document.getElementById('btn-ocupar');
+        const btnLivrar = document.getElementById('btn-livrar');
+        const textOcupar = document.getElementById('text-ocupar');
+        const textLivrar = document.getElementById('text-livrar');
+        const loaderOcupar = document.getElementById('loader-ocupar');
+        const loaderLivrar = document.getElementById('loader-livrar');
+        const feedback = document.getElementById('feedback');
+
+        function setFeedback(message, isError = false) {
+            feedback.textContent = message;
+            feedback.className = `mt-8 font-semibold text-lg transition-opacity duration-300 ${isError ? 'text-red-400' : 'text-emerald-400'} opacity-100`;
+        }
+
+        function setLoading(botão, isCarregando) {
+            btnOcupar.disabled = isCarregando;
+            btnLivrar.disabled = isCarregando;
+            
+            if (botão === 'ocupada') {
+                loaderOcupar.style.display = isCarregando ? 'block' : 'none';
+                textOcupar.style.display = isCarregando ? 'none' : 'block';
+                if(isCarregando) {
+                    btnOcupar.classList.add('opacity-75'); 
+                } else {
+                    btnOcupar.classList.remove('opacity-75');
+                }
+            } else {
+                loaderLivrar.style.display = isCarregando ? 'block' : 'none';
+                textLivrar.style.display = isCarregando ? 'none' : 'block';
+                if(isCarregando) {
+                    btnLivrar.classList.add('opacity-75');
+                } else {
+                    btnLivrar.classList.remove('opacity-75');
+                }
+            }
+        }
+
+        async function enviarStatus(status) {
+            const selectQuem = document.getElementById('select-quem');
+            const quem = selectQuem ? selectQuem.value : 'VIATURA';
+
+            setLoading(status.toLowerCase(), true);
+            setFeedback("Enviando...", false);
+
+            try {
+                // Escreve diretamente no Firebase Realtime Database
+                await database.ref('vehicles/' + quem).set(status);
+
+                setFeedback(status === 'OCUPADA' ? 'Pista Ocupada com sucesso!' : 'Pista Liberada com sucesso!');
+
+                // Confirma visualmente o status atual
+                if(status === 'OCUPADA') {
+                   btnOcupar.classList.add('ring-4', 'ring-red-300');
+                   btnLivrar.classList.remove('ring-4', 'ring-emerald-300');
+                   btnLivrar.classList.add('opacity-50');
+                   btnOcupar.classList.remove('opacity-50');
+                } else {
+                   btnLivrar.classList.add('ring-4', 'ring-emerald-300');
+                   btnOcupar.classList.remove('ring-4', 'ring-red-300');
+                   btnOcupar.classList.add('opacity-50');
+                   btnLivrar.classList.remove('opacity-50');
+                }
+            } catch (error) {
+                setFeedback("Erro de rede! Tente novamente.", true);
+                console.error("Erro ao enviar comando: ", error);
+            } finally {
+                setLoading(status.toLowerCase(), false);
+            }
+        }
+
+        btnOcupar.addEventListener('click', () => enviarStatus('OCUPADA'));
+        btnLivrar.addEventListener('click', () => enviarStatus('LIVRE'));
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Aeroporto Imperatriz</title>
+    <script src="https://unpkg.com/konva@9.3.0/konva.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyBJwvh4kJ1XCsU6fQriJh6d4gxoQrkM5kk",
+          authDomain: "movimento-pista.firebaseapp.com",
+          databaseURL: "https://movimento-pista-default-rtdb.firebaseio.com",
+          projectId: "movimento-pista",
+          storageBucket: "movimento-pista.firebasestorage.app",
+          messagingSenderId: "272997617852",
+          appId: "1:272997617852:web:ce5f4d9165d8337a9ec0b9"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+    </script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --accent-primary: #3b82f6;
+            --accent-secondary: #06b6d4;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --border-radius: 12px;
+            --border-radius-lg: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body.light-mode {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            transition: var(--transition);
+            min-height: 100vh;
+            font-weight: 400;
+            line-height: 1.6;
+        }
+
+        .main-container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding: 24px 32px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-lg);
+            backdrop-filter: blur(10px);
+        }
+
+        .header-title {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+            letter-spacing: -0.025em;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .settings-button {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border: none;
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .settings-button:hover {
+            transform: translateY(-2px) rotate(90deg);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            gap: 24px;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-areas:
+                "runway runway runway runway runway runway runway runway runway runway runway runway"
+                "controls controls controls controls controls controls logs logs logs logs logs logs";
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: 32px;
+            transition: var(--transition);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-title i {
+            color: var(--accent-primary);
+        }
+
+        .runway-area {
+            grid-area: runway;
+        }
+
+        .controls-area {
+            grid-area: controls;
+        }
+
+        .logs-area {
+            grid-area: logs;
+        }
+
+        .icon-palette {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 24px;
+            background: var(--bg-tertiary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--card-border);
+        }
+
+        .icon-item {
+            aspect-ratio: 1;
+            cursor: pointer;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .icon-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .icon-item:hover::before {
+            left: 100%;
+        }
+
+        .icon-item:hover {
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent-primary);
+        }
+
+        .icon-item img {
+            max-width: 70%;
+            max-height: 70%;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+
+        .status-display {
+            padding: 24px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            transition: var(--transition);
+            background: linear-gradient(135deg, var(--accent-success), #059669);
+            color: white;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-display.active {
+            background: linear-gradient(135deg, var(--accent-danger), #dc2626);
+            animation: pulse-danger 2s infinite;
+        }
+
+        @keyframes pulse-danger {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .metar-display {
+            border: 1px solid var(--card-border);
+            background: var(--bg-tertiary);
+            border-radius: var(--border-radius);
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metar-display.metar-alert {
+            background: linear-gradient(135deg, var(--accent-warning), #d97706);
+            animation: pulse-warning 1s infinite;
+        }
+
+        @keyframes pulse-warning {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .runway-canvas {
+            border: 2px solid var(--card-border);
+            background: #ffffff;
+            border-radius: var(--border-radius);
+            width: 100%;
+            aspect-ratio: 2 / 1;
+            max-height: 600px;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+        }
+
+        .runway-canvas:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        .observations-textarea {
+            width: 100%;
+            min-height: 200px;
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            resize: vertical;
+            font-size: 1rem;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            transition: var(--transition);
+            font-family: inherit;
+            line-height: 1.6;
+        }
+
+        .observations-textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .log-area {
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            background: var(--bg-tertiary);
+            height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-area::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        .log-area::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 4px;
+        }
+
+        .log-area ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .log-area li {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-primary);
+            font-size: 0.9rem;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .log-area li:hover {
+            transform: translateX(4px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .log-area li.new-entry {
+            animation: slideInLeft 0.5s ease-out;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .action-button {
+            padding: 12px 20px;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            text-decoration: none;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .action-button.primary {
+            background: linear-gradient(135deg, var(--accent-primary), #2563eb);
+            color: white;
+        }
+
+        .action-button.success {
+            background: linear-gradient(135deg, var(--accent-success), #059669);
+            color: white;
+        }
+
+        .action-button.secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--card-border);
+        }
+
+        .silence-alarm-button {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 1001;
+            background: linear-gradient(135deg, var(--accent-danger), #dc2626);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--shadow-lg);
+            animation: pulse-danger 2s infinite;
+        }
+
+        .context-menu {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-xl);
+            padding: 8px 0;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+        }
+
+        .context-menu button {
+            width: 100%;
+            background: none;
+            border: none;
+            text-align: left;
+            padding: 12px 16px;
+            cursor: pointer;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .context-menu button:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .context-menu button i {
+            color: var(--accent-primary);
+            width: 16px;
+            text-align: center;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            padding: 32px;
+            border-radius: var(--border-radius-lg);
+            width: 90%;
+            max-width: 600px;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--card-border);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h3 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 24px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-family: inherit;
+            transition: var(--transition);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 32px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-tertiary);
+            transition: var(--transition);
+            border-radius: 32px;
+            border: 1px solid var(--card-border);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 24px;
+            width: 24px;
+            left: 4px;
+            bottom: 3px;
+            background: white;
+            transition: var(--transition);
+            border-radius: 50%;
+            box-shadow: var(--shadow-sm);
+        }
+
+        input:checked + .slider {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(28px);
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "runway"
+                    "controls"
+                    "logs";
+            }
+            
+            .main-container {
+                padding: 16px;
+            }
+            
+            .header-container {
+                padding: 20px;
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            
+            .header-title {
+                font-size: 1.5rem;
+            }
+            
+            .icon-palette {
+                grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+                gap: 12px;
+                padding: 16px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .card {
+                padding: 20px;
+            }
+            
+            .card-header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+            
+            .header-actions {
+                flex-direction: column;
+                width: 100%;
+                gap: 8px;
+            }
+            
+            .action-button {
+                justify-content: center;
+            }
+        }
+
+        /* Animações de entrada */
+        .card {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.2s; }
+        .card:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Melhorias no annotation modal */
+        #annotation-modal {
+            position: absolute;
+            width: auto;
+            height: auto;
+            background: transparent;
+            justify-content: unset;
+            align-items: unset;
+            display: none;
+            z-index: 2000;
+        }
+
+        #annotation-modal.visible {
+            display: block;
+        }
+
+        #annotation-modal .modal-content {
+            width: 320px;
+            padding: 24px;
+            position: relative;
+        }
+
+        #annotation-modal textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        /* Efeitos de loading */
+        .loading {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            animation: loading-shimmer 1.5s infinite;
+        }
+
+        @keyframes loading-shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+    </style>
+
+</head>
+<body>
+    <div id="audio-activation-overlay" class="modal-overlay visible">
+        <div class="modal-content text-center">
+            <h3 class="text-2xl font-bold mb-4 text-white">Ativação de Áudio Necessária</h3>
+            <p class="text-lg text-gray-300">Por favor, clique em qualquer lugar da tela para habilitar as notificações sonoras do sistema.</p>
+            <i class="fas fa-volume-up fa-3x mt-6 text-blue-500 animate-pulse"></i>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="header-container">
+            <h1 class="header-title">
+                <i class="fas fa-plane"></i>
+                Monitoramento de Pista e METAR - Aeroporto de Imperatriz
+            </h1>
+            <div class="header-actions">
+                <button id="settings-button" class="settings-button" title="Configurações">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+
+        <button id="silence-alarm-button" class="silence-alarm-button">
+            <i class="fas fa-volume-mute"></i> 
+            Silenciar Alarme
+        </button>
+        
+        <div class="dashboard-grid">
+            <div id="runway-area" class="card runway-area">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-road"></i>
+                        Controle de Pista
+                    </h2>
+                </div>
+                
+                <div class="icon-palette">
+                    <div class="icon-item" data-icon-type="AERONAVE" data-image-url="AERONAVE.png">
+                        <img src="AERONAVE.png" alt="Cone">
+                    </div>
+                    <div class="icon-item" data-icon-type="ELETRICA" data-image-url="ELETRICA.png">
+                        <img src="ELETRICA.png" alt="ELETRICA">
+                    </div>
+                    <div class="icon-item" data-icon-type="FAISCA1" data-image-url="FAISCA1.png">
+                        <img src="FAISCA1.png" alt="FAISCA1">
+                    </div>
+                    <div class="icon-item" data-icon-type="FAISCA2" data-image-url="FAISCA2.png">
+                        <img src="FAISCA2.png" alt="FAISCA2">
+                    </div>
+                    <div class="icon-item" data-icon-type="FAISCA3" data-image-url="FAISCA3.png">
+                        <img src="FAISCA3.png" alt="FAISCA3">
+                    </div>
+                    <div class="icon-item" data-icon-type="MANUTENCAO1" data-image-url="MNT1.png">
+                        <img src="MNT1.png" alt="MANUTENCAO1">
+                    </div>
+                     <div class="icon-item" data-icon-type="MANUTENÇÃO2" data-image-url="MNT2.png">
+                        <img src="MNT2.png" alt="MANUTENCAO2">
+                    </div>
+                    <div class="icon-item" data-icon-type="PCM" data-image-url="PCM.png">
+                        <img src="PCM.png" alt="PCM">
+                    </div>
+                    <div class="icon-item" data-icon-type="VM1" data-image-url="VM1.png">
+                        <img src="VM1.png" alt="VM1">
+                    </div>
+                    <div class="icon-item" data-icon-type="VO1" data-image-url="VO1.png">
+                        <img src="VO1.png" alt="VO1">
+                    </div>
+                    
+                </div>
+                
+                <div id="alarm-display" class="status-display">
+                    <i class="fas fa-check-circle"></i>
+                    Pista Livre
+                </div>
+                
+                <div id="metar-display-konva-container" class="metar-display"></div>
+                
+                <div id="konva-container" class="runway-canvas"></div>
+            </div>
+            
+            <div id="controls-area" class="card controls-area">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-clipboard-list"></i>
+                        Observações
+                    </h2>
+                </div>
+                <div id="observation-area">
+                    <textarea id="observationsTextarea" class="observations-textarea" 
+                              placeholder="Escreva observações importantes aqui..."></textarea>
+                </div>
+            </div>
+
+            <div id="log-container" class="card logs-area">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-history"></i>
+                        Log de Eventos
+                    </h2>
+                    <div class="header-actions">
+                         <!-- Botão TWY C removido daqui -->
+                        <button id="generateReportButton" class="action-button primary">
+                            <i class="fas fa-chart-pie"></i> 
+                            Gerar Relatório
+                        </button>
+                        <a href="relatorio_monitoramento.html" target="_blank" class="action-button success">
+                            <i class="fas fa-chart-line"></i> 
+                            Ver Análise Completa
+                        </a>
+                    </div>
+                </div>
+                <div id="log-area" class="log-area">
+                    <ul></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="context-menu" class="context-menu">
+        <button id="annotate-icon-btn">
+            <i class="fas fa-comment-dots"></i> 
+            Adicionar Anotação
+        </button>
+        <button id="duplicate-icon-btn">
+            <i class="fas fa-copy"></i> 
+            Duplicar Ícone
+        </button>
+        <button id="remove-icon-btn">
+            <i class="fas fa-trash-alt"></i> 
+            Remover Ícone
+        </button>
+    </div>
+
+    <div id="annotation-modal">
+        <div class="modal-content">
+            <h3>Adicionar Anotação</h3>
+            <textarea id="annotationTextarea" placeholder="Digite sua anotação..."></textarea>
+            <div class="modal-actions">
+                <button id="cancel-annotation-btn" class="action-button secondary">Cancelar</button>
+                <button id="save-annotation-btn" class="action-button primary">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Configurações do Sistema</h3>
+            
+            <div class="form-group">
+                <label for="darkModeToggle">Modo Escuro</label>
+                <label class="switch">
+                    <input type="checkbox" id="darkModeToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label for="icaoCodeInput">Código ICAO do Aeroporto</label>
+                <input type="text" id="icaoCodeInput" placeholder="Ex: SBIZ" value="SBIZ">
+            </div>
+            
+            <div class="form-group">
+                <label for="soundAlarmToggle">Ativar Som do Alarme METAR</label>
+                <label class="switch">
+                    <input type="checkbox" id="soundAlarmToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label for="pollIntervalInput">Intervalo de Atualização METAR (ms)</label>
+                <input type="number" id="pollIntervalInput" min="5000" max="300000" step="1000" value="30000">
+            </div>
+            
+            <div class="form-group">
+                <label for="perimeterXInput">Perímetro X (%)</label>
+                <input type="number" id="perimeterXInput" min="0" max="100" step="1" value="10">
+            </div>
+            
+            <div class="form-group">
+                <label for="perimeterYInput">Perímetro Y (%)</label>
+                <input type="number" id="perimeterYInput" min="0" max="100" step="1" value="20">
+            </div>
+            
+            <div class="form-group">
+                <label for="perimeterWidthInput">Largura do Perímetro (%)</label>
+                <input type="number" id="perimeterWidthInput" min="0" max="100" step="1" value="80">
+            </div>
+            
+            <div class="form-group">
+                <label for="perimeterHeightInput">Altura do Perímetro (%)</label>
+                <input type="number" id="perimeterHeightInput" min="0" max="100" step="1" value="60">
+            </div>
+            
+            <div class="modal-actions">
+                <button id="cancel-settings-btn" class="action-button secondary">Cancelar</button>
+                <button id="save-settings-btn" class="action-button primary">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="report-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Relatório de Monitoramento</h3>
+            <div id="report-content">
+                <div id="report-charts">
+                    <div>
+                        <canvas id="occupancyChart"></canvas>
+                    </div>
+                    <div>
+                        <canvas id="timeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="close-report-btn" class="action-button secondary">Fechar</button>
+                <button id="download-report-btn" class="action-button primary">
+                    <i class="fas fa-download"></i>
+                    Baixar Relatório
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="metar-alarm-sound" preload="auto">
+        <source src="alarm.mp3" type="audio/mpeg">
+        <source src="alarm.wav" type="audio/wav">
+    </audio>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Lógica de ativação de áudio
+            const audioActivationOverlay = document.getElementById('audio-activation-overlay');
+            const metarAlarmSound = document.getElementById('metar-alarm-sound');
+
+            function handleAudioActivation() {
+                const playPromise = metarAlarmSound.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        metarAlarmSound.pause();
+                        metarAlarmSound.currentTime = 0;
+                        console.log("Ativação de áudio bem-sucedida.");
+                    }).catch(error => {
+                        console.warn("O usuário precisa interagir com a página para ativar o áudio.", error);
+                    });
+                }
+                audioActivationOverlay.classList.remove('visible');
+                window.removeEventListener('click', handleAudioActivation);
+                window.removeEventListener('touchend', handleAudioActivation);
+            }
+
+            if (audioActivationOverlay) {
+                window.addEventListener('click', handleAudioActivation, { once: true });
+                window.addEventListener('touchend', handleAudioActivation, { once: true });
+            }
+
+            const stage = new Konva.Stage({
+                container: 'konva-container',
+                width: document.getElementById('konva-container').offsetWidth,
+                height: document.getElementById('konva-container').offsetHeight
+            });
+            
+            const layer = new Konva.Layer();
+            stage.add(layer);
+            
+            const alarmDisplay = document.getElementById('alarm-display');
+            const observationsTextarea = document.getElementById('observationsTextarea');
+            const logList = document.querySelector('#log-area ul');
+            const metarDisplayKonvaContainer = document.getElementById('metar-display-konva-container');
+            
+            let runwayPerimeter, alarmLightIcon, alarmLightTween, perimeterAlarmTween;
+            
+            const settings = {
+                darkMode: false,
+                pollInterval: 30000,
+                icaoCode: 'SBIZ',
+                soundAlarm: true,
+                perimeterX: 10,
+                perimeterY: 20,
+                perimeterWidth: 80,
+                perimeterHeight: 60
+            };
+
+            function loadSettings() {
+                const saved = localStorage.getItem('airportSettings');
+                if (saved) {
+                    Object.assign(settings, JSON.parse(saved));
+                }
+                updateUIFromSettings();
+            }
+
+            function saveSettings() {
+                settings.darkMode = document.getElementById("darkModeToggle").checked;
+                settings.icaoCode = document.getElementById("icaoCodeInput").value;
+                settings.soundAlarm = document.getElementById("soundAlarmToggle").checked;
+                settings.pollInterval = parseInt(document.getElementById("pollIntervalInput").value);
+                settings.perimeterX = parseInt(document.getElementById("perimeterXInput").value);
+                settings.perimeterY = parseInt(document.getElementById("perimeterYInput").value);
+                settings.perimeterWidth = parseInt(document.getElementById("perimeterWidthInput").value);
+                settings.perimeterHeight = parseInt(document.getElementById("perimeterHeightInput").value);
+                
+                localStorage.setItem('airportSettings', JSON.stringify(settings));
+            }
+
+            function updateUIFromSettings() {
+                document.body.classList.toggle("light-mode", !settings.darkMode);
+                document.getElementById("darkModeToggle").checked = settings.darkMode;
+                document.getElementById("icaoCodeInput").value = settings.icaoCode;
+                document.getElementById("soundAlarmToggle").checked = settings.soundAlarm;
+                document.getElementById("pollIntervalInput").value = settings.pollInterval;
+                document.getElementById("perimeterXInput").value = settings.perimeterX;
+                document.getElementById("perimeterYInput").value = settings.perimeterY;
+                document.getElementById("perimeterWidthInput").value = settings.perimeterWidth;
+                document.getElementById("perimeterHeightInput").value = settings.perimeterHeight;
+            }
+
+            function saveIconsState() {
+                const icons = layer.find('Group').map(group => {
+                    const image = group.findOne('Image');
+                    const textNode = group.findOne('.annotation-text');
+                    return {
+                        x: group.x(),
+                        y: group.y(),
+                        imageUrl: image.attrs.imageUrl,
+                        type: image.name(),
+                        annotation: textNode ? textNode.text() : ''
+                    };
+                });
+                localStorage.setItem('runwayIcons', JSON.stringify(icons));
+            }
+
+            function loadIconsState() {
+                const saved = localStorage.getItem('runwayIcons');
+                if (saved) {
+                    const icons = JSON.parse(saved);
+                    icons.forEach(icon => {
+                        addDraggableIcon(icon.imageUrl, icon.type, icon.x, icon.y, icon.annotation);
+                    });
+                }
+            }
+
+            function addLogEntry(message) {
+                const li = document.createElement('li');
+                li.textContent = message;
+                li.className = 'new-entry';
+                logList.prepend(li);
+                setTimeout(() => li.classList.remove('new-entry'), 500);
+
+                const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzX0NsWNtFM2EfPgc2zYpWeoByt3xgjyyGsDLeB9Brt11HAULCzfCe95_ORPlHWATO2xQ/exec";
+
+                fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify({ message: message }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Resposta do Google Script:', data);
+                    if (data.status !== 'success') {
+                        console.error('O Google Script retornou um erro:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao tentar enviar o log para o Google Sheets:', error);
+                });
+            }
+
+            function initRunwayCanvas() {
+                layer.destroyChildren();
+                
+                runwayPerimeter = new Konva.Rect({
+                    x: stage.width() * (settings.perimeterX / 100),
+                    y: stage.height() * (settings.perimeterY / 100),
+                    width: stage.width() * (settings.perimeterWidth / 100),
+                    height: stage.height() * (settings.perimeterHeight / 100),
+                    fill: 'transparent',
+                    stroke: '#3b82f6',
+                    strokeWidth: 3,
+                    dash: [10, 5],
+                    listening: false
+                });
+                layer.add(runwayPerimeter);
+
+                perimeterAlarmTween = new Konva.Tween({
+                    node: runwayPerimeter,
+                    duration: 1,
+                    fill: 'rgba(239, 68, 68, 0.3)',
+                    yoyo: true,
+                    iterations: Konva.Tween.INFINITE
+                });
+                
+                try {
+                    const imgElement = new Image();
+                    imgElement.onload = () => {
+                        const aspectRatio = imgElement.width / imgElement.height;
+                        const maxWidth = stage.width() * 1.3 
+                        const maxHeight = stage.height() * 1.2;
+                        
+                        let finalWidth, finalHeight;
+                        if (maxWidth / aspectRatio <= maxHeight) {
+                            finalWidth = maxWidth;
+                            finalHeight = maxWidth / aspectRatio;
+                        } else {
+                            finalHeight = maxHeight;
+                            finalWidth = maxHeight * aspectRatio;
+                        }
+                        
+                        const image = new Konva.Image({
+                            image: imgElement,
+                            x: (stage.width() - finalWidth) / 2,
+                            y: (stage.height() - finalHeight) / 10,
+                            width: finalWidth,
+                            height: finalHeight
+                        });
+                        layer.add(image);
+                        
+                        layer.batchDraw();
+                        loadIconsState();
+                    };
+                    imgElement.src = 'pistapng.png';
+                } catch (e) {
+                    console.error("Não foi possível carregar a imagem da pista.");
+                    layer.batchDraw();
+                    loadIconsState();
+                }
+            }
+
+            function createAlarmLight() {
+                const img = new Image();
+                img.onload = () => {
+                    alarmLightIcon = new Konva.Image({
+                        image: img,
+                        x: 20,
+                        y: 20,
+                        width: 40,
+                        height: 40,
+                        visible: false,
+                        listening: false
+                    });
+                    layer.add(alarmLightIcon);
+                    alarmLightTween = new Konva.Tween({
+                        node: alarmLightIcon,
+                        duration: 0.5,
+                        opacity: 0.3,
+                        yoyo: true,
+                        iterations: -1
+                    });
+                    layer.batchDraw();
+                };
+            }
+
+            const contextMenu = document.getElementById('context-menu');
+            const removeIconBtn = document.getElementById('remove-icon-btn');
+            const annotateIconBtn = document.getElementById('annotate-icon-btn');
+            const duplicateIconBtn = document.getElementById('duplicate-icon-btn');
+            const annotationModal = document.getElementById('annotation-modal');
+            const annotationTextarea = document.getElementById('annotationTextarea');
+            const saveAnnotationBtn = document.getElementById('save-annotation-btn');
+            const cancelAnnotationBtn = document.getElementById('cancel-annotation-btn');
+
+            let currentIconTarget = null;
+            let lastContextMenuPosition = { x: 0, y: 0 };
+
+            window.addEventListener('click', (e) => {
+                contextMenu.style.display = 'none';
+                if (!annotationModal.contains(e.target) && annotationModal.classList.contains('visible')) {
+                    annotationModal.classList.remove('visible');
+                }
+            });
+
+            function handleDuplicate() {
+                if (currentIconTarget) {
+                    const group = currentIconTarget.getParent();
+                    const image = group.findOne('Image');
+                    const textNode = group.findOne('.annotation-text');
+                    addDraggableIcon(image.attrs.imageUrl, image.name(), group.x() + 20, group.y() + 20, textNode ? textNode.text() : '');
+                    addLogEntry(`${new Date().toLocaleString('pt-BR')}: ${image.name()} duplicado.`);
+                    saveIconsState();
+                }
+            }
+            
+            function handleRemove() {
+                if (currentIconTarget) {
+                    const group = currentIconTarget.getParent();
+                    if (group.getAttr('timerId')) {
+                        clearInterval(group.getAttr('timerId'));
+                    }
+                    addLogEntry(`${new Date().toLocaleString('pt-BR')}: ${currentIconTarget.name()} removido.`);
+                    group.destroy();
+                    updateAlarmStatus();
+                    saveIconsState();
+                }
+            }
+
+            removeIconBtn.addEventListener('click', () => {
+                handleRemove();
+                contextMenu.style.display = 'none';
+            });
+            
+            duplicateIconBtn.addEventListener('click', () => {
+                handleDuplicate();
+                contextMenu.style.display = 'none';
+            });
+
+            annotateIconBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (currentIconTarget) {
+                    const group = currentIconTarget.getParent();
+                    const textNode = group.findOne('.annotation-text');
+                    annotationTextarea.value = textNode ? textNode.text() : '';
+                    
+                    annotationModal.style.left = `${lastContextMenuPosition.x}px`;
+                    annotationModal.style.top = `${lastContextMenuPosition.y}px`;
+
+                    annotationModal.classList.add('visible');
+                    annotationTextarea.focus();
+                }
+                contextMenu.style.display = 'none';
+            });
+
+            saveAnnotationBtn.addEventListener('click', () => {
+                const newText = annotationTextarea.value;
+                if (currentIconTarget) {
+                    const group = currentIconTarget.getParent();
+                    let textNode = group.findOne('.annotation-text');
+
+                    if (textNode) {
+                        newText === '' ? textNode.destroy() : textNode.text(newText);
+                    } else if (newText !== '') {
+                        textNode = new Konva.Text({
+                            text: newText,
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                            fill: settings.darkMode ? '#f8fafc' : '#0f172a',
+                            name: 'annotation-text',
+                            padding: 5,
+                        });
+                        group.add(textNode);
+                    }
+                    
+                    if (textNode) {
+                        const image = group.findOne('Image');
+                        textNode.offsetX(textNode.width() / 2 - image.width() / 2);
+                        textNode.y(image.height() + 5);
+                    }
+                    saveIconsState();
+                    layer.batchDraw();
+                }
+                annotationModal.classList.remove('visible');
+            });
+
+            cancelAnnotationBtn.addEventListener('click', () => {
+                annotationModal.classList.remove('visible');
+            });
+
+            function addDraggableIcon(imageUrl, type, x, y, annotation = '') {
+                const group = new Konva.Group({
+                    x: x ?? Math.random() * (stage.width() - 60),
+                    y: y ?? Math.random() * (stage.height() - 60),
+                    draggable: true
+                });
+                
+                const imgElement = new Image();
+                imgElement.onload = () => {
+                    const image = new Konva.Image({
+                        image: imgElement,
+                        width: 75,
+                        height: 75,
+                        name: type,
+                        shadowColor: 'rgba(0,0,0,0.3)',
+                        shadowBlur: 8,
+                        shadowOffset: { x: 2, y: 2 },
+                        shadowOpacity: 0.6
+                    });
+                    image.attrs.imageUrl = imageUrl;
+                    group.add(image);
+
+                    if (annotation) {
+                        const annotationText = new Konva.Text({
+                            text: annotation,
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                            fill: settings.darkMode ? '#f8fafc' : '#0f172a',
+                            name: 'annotation-text',
+                            padding: 5
+                        });
+                        group.add(annotationText);
+                        annotationText.offsetX(annotationText.width() / 2 - image.width() / 2);
+                        annotationText.y(image.height() + 5);
+                    }
+                    
+                    layer.add(group);
+                    
+                    group.on('dragend', () => {
+                        checkPerimeter(group);
+                        saveIconsState();
+                    });
+                    
+                    group.on('dragmove', () => checkPerimeter(group));
+                    
+                    group.on('contextmenu', (e) => {
+                        e.evt.preventDefault();
+                        annotationModal.classList.remove('visible');
+                        currentIconTarget = image;
+
+                        lastContextMenuPosition.x = e.evt.clientX + 5;
+                        lastContextMenuPosition.y = e.evt.clientY + 5;
+
+                        contextMenu.style.left = `${lastContextMenuPosition.x}px`;
+                        contextMenu.style.top = `${lastContextMenuPosition.y}px`;
+                        contextMenu.style.display = 'block';
+                    });
+                    
+                    group.on('dblclick', () => {
+                        currentIconTarget = image;
+                        handleRemove();
+                    });
+                    
+                    checkPerimeter(group);
+                };
+                imgElement.src = imageUrl;
+            }
+            
+            function formatTime(milliseconds) {
+                if (isNaN(milliseconds) || milliseconds < 0) return '00:00';
+                const totalSeconds = Math.floor(milliseconds / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                return `${String(minutes).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
+            }
+
+            function checkPerimeter(group) {
+                if (!runwayPerimeter) return;
+                
+                const iconRect = group.getClientRect({ relativeTo: layer });
+                const perimeterRect = runwayPerimeter.getClientRect({ relativeTo: layer });
+                const isInside = Konva.Util.haveIntersection(iconRect, perimeterRect);
+                const iconType = group.findOne('Image').name();
+
+                let stateChanged = false;
+                if (isInside && !group.attrs.isCurrentlyInside) {
+                    addLogEntry(`${new Date().toLocaleString('pt-BR')}: ${iconType} ENTROU na pista.`);
+                    group.setAttr('isCurrentlyInside', true);
+                    group.setAttr('startTime', new Date());
+
+                    const timerText = new Konva.Text({
+                        text: '00:00',
+                        fontSize: 14,
+                        fontFamily: 'Inter, sans-serif',
+                        fill: 'white',
+                        background: 'rgba(0,0,0,0.8)',
+                        padding: 6,
+                        cornerRadius: 6,
+                        y: -30,
+                        name: 'timer-text',
+                    });
+                    group.add(timerText);
+                    timerText.offsetX(timerText.width() / 2 - group.findOne('Image').width() / 2);
+
+                    const timerId = setInterval(() => {
+                        timerText.text(formatTime(new Date() - group.getAttr('startTime')));
+                        if (group.getLayer()) {
+                            group.getLayer().batchDraw();
+                        }
+                    }, 1000);
+                    group.setAttr('timerId', timerId);
+                    stateChanged = true;
+
+                } else if (!isInside && group.attrs.isCurrentlyInside) {
+                    addLogEntry(`${new Date().toLocaleString('pt-BR')}: ${iconType} SAIU da pista.`);
+                    group.setAttr('isCurrentlyInside', false);
+
+                    if (group.getAttr('timerId')) {
+                        clearInterval(group.getAttr('timerId'));
+                        group.setAttr('timerId', null);
+                    }
+                    const timerTextNode = group.findOne('.timer-text');
+                    if (timerTextNode) {
+                        timerTextNode.destroy();
+                    }
+                    group.setAttr('startTime', null);
+                    stateChanged = true;
+                }
+
+                if (stateChanged) {
+                    updateAlarmStatus();
+                }
+            }
+            
+            function updateIconNumbers() {
+                layer.find('.number-badge-group').forEach(badge => badge.destroy());
+
+                const iconsInsideByType = {};
+                layer.find('Group').forEach(group => {
+                    if (group.attrs.isCurrentlyInside) {
+                        const type = group.findOne('Image')?.name();
+                        if (type) {
+                            if (!iconsInsideByType[type]) {
+                                iconsInsideByType[type] = [];
+                            }
+                            iconsInsideByType[type].push(group);
+                        }
+                    }
+                });
+
+                for (const type in iconsInsideByType) {
+                    const groups = iconsInsideByType[type];
+                    if (groups.length > 1) {
+                        groups.sort((a, b) => a.getAttr('startTime') - b.getAttr('startTime'));
+                        
+                        groups.forEach((group, index) => {
+                            const number = index + 1;
+
+                            const badgeGroup = new Konva.Group({
+                                x: group.findOne('Image').width() - 12,
+                                y: -12,
+                                name: 'number-badge-group',
+                            });
+
+                            const badgeCircle = new Konva.Rect({
+                                width: 24,
+                                height: 24,
+                                fill: '#ef4444',
+                                cornerRadius: 12,
+                                stroke: 'white',
+                                strokeWidth: 2,
+                                shadowColor: 'black',
+                                shadowBlur: 5,
+                                shadowOpacity: 0.5,
+                            });
+
+                            const numberText = new Konva.Text({
+                                text: String(number),
+                                fontSize: 14,
+                                fontFamily: 'Inter, sans-serif',
+                                fill: 'white',
+                                width: 24,
+                                height: 24,
+                                align: 'center',
+                                verticalAlign: 'middle',
+                                fontStyle: 'bold',
+                            });
+
+                            badgeGroup.add(badgeCircle, numberText);
+                            group.add(badgeGroup);
+                        });
+                    }
+                }
+            }
+
+
+            function updateAlarmStatus() {
+                const isOccupied = layer.find('Group').some(group => group.attrs.isCurrentlyInside);
+                
+                if (isOccupied) {
+                    alarmDisplay.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Pista Ocupada!';
+                    alarmDisplay.classList.add('active');
+                    perimeterAlarmTween?.play();
+                } else {
+                    alarmDisplay.innerHTML = '<i class="fas fa-check-circle"></i> Pista Livre';
+                    alarmDisplay.classList.remove('active');
+                    perimeterAlarmTween?.pause();
+                    perimeterAlarmTween?.seek(0);
+                    runwayPerimeter?.fill('transparent');
+                }
+
+                if (alarmLightIcon) {
+                    alarmLightIcon.visible(isOccupied);
+                    isOccupied ? alarmLightTween?.play() : alarmLightTween?.pause();
+                }
+                
+                updateIconNumbers();
+                layer.batchDraw();
+            }
+
+            document.querySelectorAll('.icon-palette .icon-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    addDraggableIcon(item.dataset.imageUrl, item.dataset.iconType);
+                    addLogEntry(`${new Date().toLocaleString('pt-BR')}: ${item.dataset.iconType} adicionado ao pátio.`);
+                    saveIconsState();
+                });
+            });
+
+            // METAR functionality
+            const silenceAlarmButton = document.getElementById('silence-alarm-button');
+            let pollingIntervalIdMetar, isAlarmPlayingMetar = false, metarTextKonva;
+            const API_KEY = "ttMZrBTp4mD0xMkYAVxKMzyu7B9KL1nfCS6T1fMR";
+
+            let alarmState = {
+                lastCheckedUTCHour: -1,
+                hasAlarmedThisHour: false
+            };
+
+            function initMetarDisplay() {
+                metarDisplayKonvaContainer.innerHTML = '';
+                const stage = new Konva.Stage({
+                    container: metarDisplayKonvaContainer,
+                    width: metarDisplayKonvaContainer.offsetWidth,
+                    height: metarDisplayKonvaContainer.offsetHeight
+                });
+                const layer = new Konva.Layer();
+                stage.add(layer);
+                
+                metarTextKonva = new Konva.Text({
+                    width: stage.width(),
+                    height: stage.height(),
+                    text: 'Aguardando METAR...',
+                    fontSize: 16,
+                    fontFamily: 'Inter',
+                    fill: settings.darkMode ? '#f8fafc' : '#0f172a',
+                    align: 'center',
+                    verticalAlign: 'middle',
+                });
+                layer.add(metarTextKonva);
+                layer.batchDraw();
+            }
+
+            function updateMetarDisplay(message) {
+                if (!metarTextKonva) return;
+                
+                metarTextKonva.text(message);
+                let fontSize = 24;
+                metarTextKonva.fontSize(fontSize);
+                
+                while (metarTextKonva.width() > metarTextKonva.getStage().width() || 
+                       metarTextKonva.height() > metarTextKonva.getStage().height()) {
+                    fontSize--;
+                    metarTextKonva.fontSize(fontSize);
+                    if (fontSize < 10) break;
+                }
+                metarTextKonva.getLayer().batchDraw();
+            }
+
+            function startPollingMetar() {
+                if (pollingIntervalIdMetar) clearInterval(pollingIntervalIdMetar);
+                pollingIntervalIdMetar = setInterval(fetchMetarSpeci, settings.pollInterval);
+            }
+            
+            function hideMetarAlarm(isManualSilence = false) {
+                silenceAlarmButton.style.display = 'none';
+                metarDisplayKonvaContainer.classList.remove('metar-alert');
+                if (isAlarmPlayingMetar) {
+                    metarAlarmSound.pause();
+                    metarAlarmSound.currentTime = 0;
+                    isAlarmPlayingMetar = false;
+                }
+
+                if (isManualSilence) {
+                    const now = new Date();
+                    const currentUTCHour = now.getUTCHours();
+                    const currentUTCMinutes = now.getUTCMinutes();
+                    
+                    const isQuietHours = (currentUTCHour >= 21) || (currentUTCHour < 3) || (currentUTCHour === 3 && currentUTCMinutes <= 15);
+
+                    if (isQuietHours) {
+                        if (currentUTCHour !== alarmState.lastCheckedUTCHour) {
+                            alarmState.lastCheckedUTCHour = currentUTCHour;
+                        }
+                        alarmState.hasAlarmedThisHour = true;
+                    }
+                }
+            }
+
+            function showMetarAlarm() {
+                const now = new Date();
+                const currentUTCHour = now.getUTCHours();
+                const currentUTCMinutes = now.getUTCMinutes();
+
+                if (currentUTCHour !== alarmState.lastCheckedUTCHour) {
+                    alarmState.lastCheckedUTCHour = currentUTCHour;
+                    alarmState.hasAlarmedThisHour = false;
+                }
+
+                const isQuietHours = (currentUTCHour >= 21) || (currentUTCHour < 3) || (currentUTCHour === 3 && currentUTCMinutes <= 15);
+
+                let shouldPlaySound = true;
+                const shouldLoopSound = !isQuietHours;
+
+                if (isQuietHours) {
+                    if (alarmState.hasAlarmedThisHour) {
+                        shouldPlaySound = false;
+                    }
+                }
+
+                silenceAlarmButton.style.display = 'flex';
+                metarDisplayKonvaContainer.classList.add('metar-alert');
+
+                if (shouldPlaySound && settings.soundAlarm && !isAlarmPlayingMetar) {
+                    metarAlarmSound.loop = shouldLoopSound;
+                    metarAlarmSound.play().catch(e => console.error("Falha ao tocar áudio.", e));
+                    isAlarmPlayingMetar = true;
+                    
+                    if (isQuietHours) {
+                        alarmState.hasAlarmedThisHour = true;
+                    }
+                }
+            }
+
+            function shouldTriggerAlarm() {
+                const now = new Date();
+                const utcHour = now.getUTCHours();
+                
+                if (alarmState.lastCheckedUTCHour !== utcHour) {
+                    alarmState.lastCheckedUTCHour = utcHour;
+                    alarmState.hasAlarmedThisHour = false;
+                }
+                
+                return !alarmState.hasAlarmedThisHour;
+            }
+
+            async function fetchMetarSpeci() {
+                if (!settings.icaoCode) {
+                    updateMetarDisplay('Insira um código ICAO.');
+                    return;
+                }
+                updateMetarDisplay('Carregando...');
+                const now = new Date();
+                const oneHourAgo = new Date(now.getTime() - 3600000);
+                const formatDT = (d) => d.toISOString().slice(0, 13).replace(/[-T]/g, '');
+                const url = `https://api-redemet.decea.mil.br/mensagens/metar/${settings.icaoCode}?api_key=${API_KEY}&data_ini=${formatDT(oneHourAgo)}&data_fim=${formatDT(now)}`;
+
+                let triggerAlarm = false;
+
+                try {
+                    const response = await fetch(url, { cache: 'no-store' });
+                    if (!response.ok) throw new Error(`Erro ${response.status}`);
+                    const data = await response.json();
+                    const messages = data?.data?.data;
+                    
+                    const nowUTCHour = now.getUTCHours();
+                    const nowUTCMinute = now.getUTCMinutes();
+
+                    if (messages && messages.length > 0) {
+                        messages.sort((a, b) => new Date(b.recebimento) - new Date(a.recebimento));
+                        const latestMessage = messages[0].mens;
+                        updateMetarDisplay(latestMessage);
+
+                        const msgTimeMatch = latestMessage.match(/\s\d{2}(\d{2})\d{2}Z/);
+                        const msgHour = msgTimeMatch ? parseInt(msgTimeMatch[1], 10) : -1;
+                        
+                        if (msgHour !== nowUTCHour && nowUTCMinute > 1) {
+                            if (nowUTCHour === 3 && nowUTCMinute <= 15 && msgHour === 2) {
+                                triggerAlarm = false;
+                            } else {
+                                triggerAlarm = true;
+                            }
+                        }
+
+                    } else {
+                        updateMetarDisplay('Nenhum METAR encontrado.');
+                        if (nowUTCMinute > 1) {
+                            if (!(nowUTCHour === 3 && nowUTCMinute <= 15)) {
+                                triggerAlarm = true;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    updateMetarDisplay(`Falha na busca: ${error.message}`);
+                    if (new Date().getUTCMinutes() > 1) {
+                        triggerAlarm = true;
+                    }
+                }
+
+                if (triggerAlarm) {
+                    showMetarAlarm();
+                } else {
+                    hideMetarAlarm();
+                }
+            }
+
+            silenceAlarmButton.addEventListener('click', () => hideMetarAlarm(true));
+
+            const settingsButton = document.getElementById('settings-button');
+            const settingsModal = document.getElementById('settings-modal');
+            const saveSettingsBtn = document.getElementById('save-settings-btn');
+            const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
+
+            settingsButton.addEventListener('click', () => {
+                settingsModal.classList.add('visible');
+            });
+
+            cancelSettingsBtn.addEventListener('click', () => {
+                settingsModal.classList.remove('visible');
+                updateUIFromSettings();
+            });
+
+            saveSettingsBtn.addEventListener('click', () => {
+                settings.darkMode = document.getElementById('darkModeToggle').checked;
+                settings.icaoCode = document.getElementById("icaoCodeInput").value.toUpperCase();
+                settings.pollInterval = parseInt(document.getElementById("pollIntervalInput").value);
+                settings.soundAlarm = document.getElementById("soundAlarmToggle").checked;
+                settings.perimeterX = parseInt(document.getElementById('perimeterXInput').value);
+                settings.perimeterY = parseInt(document.getElementById('perimeterYInput').value);
+                settings.perimeterWidth = parseInt(document.getElementById('perimeterWidthInput').value);
+                settings.perimeterHeight = parseInt(document.getElementById('perimeterHeightInput').value);
+                
+                saveSettings();
+                location.reload();
+            });
+
+            const generateReportButton = document.getElementById('generateReportButton');
+            const reportModal = document.getElementById('report-modal');
+            const closeReportBtn = document.getElementById('close-report-btn');
+
+            generateReportButton.addEventListener('click', () => {
+                generateReport();
+                reportModal.classList.add('visible');
+            });
+
+            closeReportBtn.addEventListener('click', () => {
+                reportModal.classList.remove('visible');
+            });
+
+            function generateReport() {
+                console.log('Gerando relatório...');
+            }
+
+            window.addEventListener('click', (e) => {
+                if (e.target === settingsModal) {
+                    settingsModal.classList.remove('visible');
+                }
+                if (e.target === reportModal) {
+                    reportModal.classList.remove('visible');
+                }
+            });
+
+            observationsTextarea.addEventListener('input', () => {
+                localStorage.setItem('observationsText', observationsTextarea.value);
+            });
+
+            window.addEventListener('resize', () => {
+                const container = document.getElementById('konva-container');
+                stage.width(container.offsetWidth);
+                stage.height(container.offsetHeight);
+                initRunwayCanvas();
+            });
+
+            // Funcionalidade do contador TWY C removida
+            // const twycLogBtn = document.getElementById('twyc-log-btn');
+            // const twycCounterSpan = document.getElementById('twyc-counter');
+            // let twycCounter = 0;
+
+            // function loadTwycCounter() {
+            //     const savedCount = localStorage.getItem('twycCounter');
+            //     twycCounter = savedCount ? parseInt(savedCount, 10) : 0;
+            //     twycCounterSpan.textContent = twycCounter;
+            // }
+
+            // twycLogBtn.addEventListener('click', () => {
+            //     twycCounter++;
+            //     twycCounterSpan.textContent = twycCounter;
+            //     localStorage.setItem('twycCounter', twycCounter);
+                
+            //     const now = new Date().toLocaleString('pt-BR');
+            //     addLogEntry(`${now}: TWYC - Entrada/Saída registrada.`);
+            // });
+
+            let autoFiscalIconGroups = {};
+            let lastFiscalStatuses = {};
+
+            function initFirebaseListener() {
+                database.ref('vehicles').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        for (const [quem, status] of Object.entries(data)) {
+                            handleFiscalStatusChange(status, quem);
+                        }
+                        // Limpa os que não estão mais lá
+                        for (const quem of Object.keys(autoFiscalIconGroups)) {
+                            if (!data[quem]) {
+                                handleFiscalStatusChange('LIVRE', quem);
+                            }
+                        }
+                    } else {
+                        // Limpa todos se o nó vehicles for apagado
+                        for (const quem of Object.keys(autoFiscalIconGroups)) {
+                            handleFiscalStatusChange('LIVRE', quem);
+                        }
+                    }
+                });
+            }
+
+            function handleFiscalStatusChange(novoStatus, quem = 'VIATURA') {
+                const lastStatus = lastFiscalStatuses[quem] || 'LIVRE';
+                if (novoStatus === lastStatus) return; 
+                lastFiscalStatuses[quem] = novoStatus;
+
+                let imageUrl = 'viatura.png';
+                let iconText = quem === 'VIATURA' ? 'FISCAL (Auto)' : `${quem} (Auto)`;
+
+                const iconMapping = {
+                    'ELETRICA': 'ELETRICA.png',
+                    'FAISCA1': 'FAISCA1.png',
+                    'FAISCA2': 'FAISCA2.png',
+                    'FAISCA3': 'FAISCA3.png',
+                    'MANUTENCAO1': 'MNT1.png',
+                    'MANUTENÇÃO2': 'MNT2.png',
+                    'PCM': 'PCM.png',
+                    'VM1': 'VM1.png',
+                    'VO1': 'VO1.png',
+                    'VIATURA': 'viatura.png'
+                };
+
+                if (iconMapping[quem]) {
+                    imageUrl = iconMapping[quem];
+                    iconText = quem === 'VIATURA' ? 'FISCAL (Auto)' : `${quem} (Auto)`;
+                }
+
+                if (novoStatus === 'OCUPADA') {
+                    if (!autoFiscalIconGroups[quem]) {
+                        // Spread icons slightly so they don't overlap completely
+                        const offsetBase = Object.keys(autoFiscalIconGroups).length * 20;
+                        const centerX = runwayPerimeter.x() + runwayPerimeter.width() / 2 - 37.5 + offsetBase;
+                        const centerY = runwayPerimeter.y() + runwayPerimeter.height() / 2 - 37.5 + offsetBase;
+                        
+                        const group = new Konva.Group({
+                            x: centerX,
+                            y: centerY,
+                            draggable: true
+                        });
+                        autoFiscalIconGroups[quem] = group;
+                        
+                        const imgElement = new Image();
+                        imgElement.onload = () => {
+                            const image = new Konva.Image({
+                                image: imgElement,
+                                width: 75,
+                                height: 75,
+                                name: quem, // name to identify type nicely
+                                shadowColor: 'rgba(0,0,0,0.3)',
+                                shadowBlur: 8,
+                                shadowOffset: { x: 2, y: 2 },
+                                shadowOpacity: 0.6
+                            });
+                            image.attrs.imageUrl = imageUrl;
+                            group.add(image);
+
+                            const annotationText = new Konva.Text({
+                                text: iconText,
+                                fontSize: 14,
+                                fontFamily: 'Inter',
+                                fill: settings.darkMode ? '#f8fafc' : '#0f172a',
+                                name: 'annotation-text',
+                                padding: 5
+                            });
+                            group.add(annotationText);
+                            annotationText.offsetX(annotationText.width() / 2 - image.width() / 2);
+                            annotationText.y(image.height() + 5);
+
+                            layer.add(group);
+                            
+                            group.on('dragend', () => checkPerimeter(group));
+                            group.on('dragmove', () => checkPerimeter(group));
+                            
+                            // Força o efeito de entrar na pista
+                            checkPerimeter(group);
+                            layer.batchDraw();
+                            addLogEntry(`${new Date().toLocaleString('pt-BR')}: ${iconText} sinalizou ENTRADA na pista via Mobile.`);
+                        };
+                        imgElement.src = imageUrl;
+                    }
+                } else if (novoStatus === 'LIVRE') {
+                    const group = autoFiscalIconGroups[quem];
+                    if (group) {
+                        addLogEntry(`${new Date().toLocaleString('pt-BR')}: ${iconText} sinalizou SAÍDA da pista via Mobile.`);
+                        if (group.getAttr('timerId')) {
+                            clearInterval(group.getAttr('timerId'));
+                        }
+                        group.destroy();
+                        delete autoFiscalIconGroups[quem];
+                        updateAlarmStatus();
+                        layer.batchDraw();
+                    }
+                }
+            }
+
+            // Inicia o listener em tempo real do Firebase
+            initFirebaseListener();
+
+            // Initialize everything
+            loadSettings();
+            initRunwayCanvas();
+            createAlarmLight();
+            observationsTextarea.value = localStorage.getItem('observationsText') || '';
+            initMetarDisplay();
+            fetchMetarSpeci();
+            startPollingMetar();
+        });
+    </script>
+</body>
+</html>
