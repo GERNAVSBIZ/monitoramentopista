@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Visualização de Pista — DNIZ</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBJwvh4kJ1XCsU6fQriJh6d4gxoQrkM5kk",
+            authDomain: "movimento-pista.firebaseapp.com",
+            databaseURL: "https://movimento-pista-default-rtdb.firebaseio.com",
+            projectId: "movimento-pista",
+            storageBucket: "movimento-pista.firebasestorage.app",
+            messagingSenderId: "272997617852",
+            appId: "1:272997617852:web:ce5f4d9165d8337a9ec0b9"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+    </script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --color-livre: #10b981;
+            --color-livre-dark: #059669;
+            --color-ocupada: #ef4444;
+            --color-ocupada-dark: #dc2626;
+            --color-bg: #0f172a;
+            --color-card: #1e293b;
+            --color-border: #334155;
+            --color-text: #f8fafc;
+            --color-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 16px;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        .header {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .header-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--color-text);
+            line-height: 1.2;
+        }
+
+        .header-subtitle {
+            font-size: 0.72rem;
+            color: var(--color-muted);
+            font-weight: 400;
+            margin-top: 2px;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #34d399;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            background: #34d399;
+            border-radius: 50%;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.7); }
+        }
+
+        /* ── Status Card ── */
+        .status-card {
+            width: 100%;
+            max-width: 520px;
+            border-radius: 24px;
+            padding: 40px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 16px;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            min-height: 260px;
+            margin-bottom: 20px;
+            border: 2px solid transparent;
+        }
+
+        .status-card.livre {
+            background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(5,150,105,0.10));
+            border-color: rgba(16, 185, 129, 0.4);
+            box-shadow: 0 0 60px rgba(16,185,129,0.15), 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .status-card.ocupada {
+            background: linear-gradient(135deg, rgba(239,68,68,0.2), rgba(220,38,38,0.12));
+            border-color: rgba(239, 68, 68, 0.5);
+            box-shadow: 0 0 60px rgba(239,68,68,0.2), 0 20px 40px rgba(0,0,0,0.3);
+            animation: ocupada-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes ocupada-pulse {
+            0%, 100% { box-shadow: 0 0 60px rgba(239,68,68,0.2), 0 20px 40px rgba(0,0,0,0.3); }
+            50% { box-shadow: 0 0 100px rgba(239,68,68,0.45), 0 20px 40px rgba(0,0,0,0.3); }
+        }
+
+        .status-glow {
+            position: absolute;
+            top: -50%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            opacity: 0.12;
+            pointer-events: none;
+            transition: background 0.5s ease;
+        }
+
+        .status-card.livre .status-glow { background: radial-gradient(circle, #10b981, transparent); }
+        .status-card.ocupada .status-glow { background: radial-gradient(circle, #ef4444, transparent); }
+
+        .status-icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.8rem;
+            transition: all 0.5s ease;
+            position: relative;
+            z-index: 1;
+        }
+
+        .status-card.livre .status-icon {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 8px 32px rgba(16,185,129,0.5);
+        }
+
+        .status-card.ocupada .status-icon {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 8px 32px rgba(239,68,68,0.5);
+            animation: shake-icon 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes shake-icon {
+            from { transform: rotate(-3deg) scale(1); }
+            to { transform: rotate(3deg) scale(1.05); }
+        }
+
+        .status-label {
+            font-size: clamp(2.2rem, 10vw, 3.2rem);
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            position: relative;
+            z-index: 1;
+            transition: color 0.5s ease;
+        }
+
+        .status-card.livre .status-label { color: #34d399; }
+        .status-card.ocupada .status-label { color: #f87171; }
+
+        .status-sublabel {
+            font-size: 1rem;
+            color: var(--color-muted);
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Veículos na pista ── */
+        .vehicles-section {
+            width: 100%;
+            max-width: 520px;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .vehicles-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--color-muted);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .vehicles-title i {
+            color: #3b82f6;
+        }
+
+        .vehicles-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .vehicle-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.25);
+            border-radius: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .vehicle-icon {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            flex-shrink: 0;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+        }
+
+        .vehicle-info {
+            flex: 1;
+        }
+
+        .vehicle-name {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--color-text);
+        }
+
+        .vehicle-status-badge {
+            font-size: 0.7rem;
+            color: #f87171;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .vehicle-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: blink 1s infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+
+        .vehicles-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--color-muted);
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .vehicles-empty i {
+            font-size: 1.8rem;
+            color: #334155;
+        }
+
+        /* ── Histórico ── */
+        .log-section {
+            width: 100%;
+            max-width: 520px;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .log-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--color-muted);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-title i { color: #3b82f6; }
+
+        .log-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .log-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .log-list::-webkit-scrollbar-track {
+            background: var(--color-bg);
+            border-radius: 4px;
+        }
+
+        .log-list::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        .log-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            border-left: 3px solid #334155;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .log-item.ocupada { border-left-color: #ef4444; }
+        .log-item.livre { border-left-color: #10b981; }
+
+        .log-time {
+            color: var(--color-muted);
+            font-size: 0.72rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .log-text {
+            color: var(--color-text);
+        }
+
+        .log-empty {
+            text-align: center;
+            color: var(--color-muted);
+            font-size: 0.85rem;
+            padding: 16px;
+        }
+
+        /* ── Connecting overlay ── */
+        .connecting-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+            transition: opacity 0.4s ease;
+        }
+
+        .connecting-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(59,130,246,0.2);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .connecting-text {
+            color: var(--color-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            width: 100%;
+            max-width: 520px;
+            text-align: center;
+            color: #475569;
+            font-size: 0.72rem;
+            padding-bottom: 16px;
+        }
+
+        /* ── Responsividade ── */
+        @media (min-width: 520px) {
+            body { padding: 24px 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay de conexão -->
+    <div class="connecting-overlay" id="connecting-overlay">
+        <div class="spinner"></div>
+        <p class="connecting-text">Conectando ao sistema...</p>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <i class="fas fa-plane"></i>
+            </div>
+            <div>
+                <div class="header-title">Visualização de Pista</div>
+                <div class="header-subtitle">Aeroporto de Imperatriz · Modo Leitura</div>
+            </div>
+        </div>
+        <div class="live-badge">
+            <div class="live-dot"></div>
+            AO VIVO
+        </div>
+    </header>
+
+    <!-- Card de Status Principal -->
+    <div class="status-card livre" id="status-card">
+        <div class="status-glow"></div>
+        <div class="status-icon" id="status-icon">
+            <i class="fas fa-check-circle" id="status-icon-i"></i>
+        </div>
+        <div class="status-label" id="status-label">PISTA LIVRE</div>
+        <div class="status-sublabel" id="status-sublabel">Nenhum veículo na pista</div>
+    </div>
+
+    <!-- Veículos na Pista -->
+    <section class="vehicles-section">
+        <div class="vehicles-title">
+            <i class="fas fa-truck"></i>
+            Veículos na Pista
+            <span id="vehicle-count" style="margin-left:auto; background:#334155; color:#94a3b8; border-radius:20px; padding:2px 10px; font-size:0.75rem;">0</span>
+        </div>
+        <div class="vehicles-list" id="vehicles-list">
+            <div class="vehicles-empty">
+                <i class="fas fa-road"></i>
+                <span>Nenhum veículo na pista no momento</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Histórico de Eventos -->
+    <section class="log-section">
+        <div class="log-title">
+            <i class="fas fa-history"></i>
+            Histórico de Eventos (Sessão)
+        </div>
+        <div class="log-list" id="log-list">
+            <div class="log-empty">Aguardando eventos...</div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        DNIZ · Sistema de Monitoramento de Pista · Somente Visualização
+    </footer>
+
+    <script>
+        // ── Mapeamento de ícones ──
+        const iconMapping = {
+            'ELETRICA':    { img: 'ELETRICA.png',   label: 'Elétrica' },
+            'FAISCA1':     { img: 'FAISCA1.png',    label: 'Faísca 1' },
+            'FAISCA2':     { img: 'FAISCA2.png',    label: 'Faísca 2' },
+            'FAISCA3':     { img: 'FAISCA3.png',    label: 'Faísca 3' },
+            'MANUTENCAO1': { img: 'MNT1.png',       label: 'Manutenção 1' },
+            'MANUTENÇÃO2': { img: 'MNT2.png',       label: 'Manutenção 2' },
+            'PCM':         { img: 'PCM.png',        label: 'PCM' },
+            'VM1':         { img: 'VM1.png',        label: 'VM1' },
+            'VO1':         { img: 'VO1.png',        label: 'VO1' },
+            'VIATURA':     { img: 'viatura.png',    label: 'Viatura' },
+        };
+
+        // ── Estado atual ──
+        let currentVehicles = {}; // { quem: status }
+        let sessionLog = [];
+
+        // ── Elementos ──
+        const statusCard      = document.getElementById('status-card');
+        const statusIcon      = document.getElementById('status-icon');
+        const statusIconI     = document.getElementById('status-icon-i');
+        const statusLabel     = document.getElementById('status-label');
+        const statusSublabel  = document.getElementById('status-sublabel');
+        const vehiclesList    = document.getElementById('vehicles-list');
+        const vehicleCount    = document.getElementById('vehicle-count');
+        const logList         = document.getElementById('log-list');
+        const connectingOverlay = document.getElementById('connecting-overlay');
+
+        // ── Renderizar status geral ──
+        function renderStatus() {
+            const ocupados = Object.entries(currentVehicles).filter(([k, v]) => v === 'OCUPADA');
+            const isOcupada = ocupados.length > 0;
+
+            // Card principal
+            statusCard.className = 'status-card ' + (isOcupada ? 'ocupada' : 'livre');
+
+            if (isOcupada) {
+                statusIconI.className = 'fas fa-exclamation-triangle';
+                statusLabel.textContent = 'PISTA OCUPADA';
+                statusSublabel.textContent = ocupados.length === 1
+                    ? '1 veículo na pista'
+                    : `${ocupados.length} veículos na pista`;
+            } else {
+                statusIconI.className = 'fas fa-check-circle';
+                statusLabel.textContent = 'PISTA LIVRE';
+                statusSublabel.textContent = 'Nenhum veículo na pista';
+            }
+
+            // Lista de veículos
+            vehicleCount.textContent = ocupados.length;
+
+            if (ocupados.length === 0) {
+                vehiclesList.innerHTML = `
+                    <div class="vehicles-empty">
+                        <i class="fas fa-road"></i>
+                        <span>Nenhum veículo na pista no momento</span>
+                    </div>`;
+            } else {
+                vehiclesList.innerHTML = '';
+                ocupados.forEach(([quem]) => {
+                    const info = iconMapping[quem] || { img: 'viatura.png', label: quem };
+                    const item = document.createElement('div');
+                    item.className = 'vehicle-item';
+                    item.innerHTML = `
+                        <img class="vehicle-icon" src="${info.img}" alt="${info.label}"
+                             onerror="this.src='viatura.png'">
+                        <div class="vehicle-info">
+                            <div class="vehicle-name">${info.label}</div>
+                            <div class="vehicle-status-badge">● Na pista</div>
+                        </div>
+                        <div class="vehicle-indicator"></div>`;
+                    vehiclesList.appendChild(item);
+                });
+            }
+        }
+
+        // ── Adicionar log ──
+        function addLog(texto, tipo) {
+            // Remove placeholder
+            const placeholder = logList.querySelector('.log-empty');
+            if (placeholder) placeholder.remove();
+
+            const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const item = document.createElement('div');
+            item.className = `log-item ${tipo}`;
+            item.innerHTML = `<span class="log-time">${now}</span><span class="log-text">${texto}</span>`;
+            logList.prepend(item);
+
+            // Manter máximo 50 logs
+            while (logList.children.length > 50) {
+                logList.removeChild(logList.lastChild);
+            }
+        }
+
+        // ── Processar mudança do Firebase ──
+        function processar(novosDados) {
+            const novo = novosDados || {};
+
+            // Detecta mudanças
+            const todosQuem = new Set([...Object.keys(currentVehicles), ...Object.keys(novo)]);
+
+            todosQuem.forEach(quem => {
+                const statusAnterior = currentVehicles[quem] || 'LIVRE';
+                const novoStatus = novo[quem] || 'LIVRE';
+                const info = iconMapping[quem] || { label: quem };
+
+                if (novoStatus !== statusAnterior) {
+                    if (novoStatus === 'OCUPADA') {
+                        addLog(`${info.label} entrou na pista`, 'ocupada');
+                    } else {
+                        addLog(`${info.label} saiu da pista`, 'livre');
+                    }
+                }
+            });
+
+            // Atualiza estado
+            currentVehicles = {};
+            Object.entries(novo).forEach(([quem, status]) => {
+                currentVehicles[quem] = status;
+            });
+
+            renderStatus();
+        }
+
+        // ── Firebase listener ──
+        database.ref('vehicles').on('value', (snapshot) => {
+            // Esconde overlay de conexão
+            connectingOverlay.classList.add('hidden');
+
+            processar(snapshot.val());
+        }, (error) => {
+            console.error('Erro Firebase:', error);
+            connectingOverlay.classList.remove('hidden');
+        });
+
+        // Timeout de segurança para o overlay
+        setTimeout(() => {
+            connectingOverlay.classList.add('hidden');
+        }, 8000);
+    </script>
+</body>
+</html>
