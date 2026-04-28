@@ -981,27 +981,79 @@
         </div>
     </div>
 
-    <audio id="metar-alarm-sound" preload="auto">
-        <source src="alarm.mp3" type="audio/mpeg">
-        <source src="alarm.wav" type="audio/wav">
-    </audio>
+    <!-- Alarme sonoro gerado via Web Audio API (sem arquivo externo) -->
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Lógica de ativação de áudio
+            // ── Alarme sonoro via Web Audio API (bip sintético — sem arquivo externo) ──
             const audioActivationOverlay = document.getElementById('audio-activation-overlay');
-            const metarAlarmSound = document.getElementById('metar-alarm-sound');
+            let audioCtx = null;
+            let bipIntervalId = null;
+
+            // Inicializa o AudioContext após interação do usuário (política do browser)
+            function initAudioCtx() {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            // Toca um bip único: frequência padrão 880 Hz, duração 200 ms
+            function tocarBip(frequencia = 880, duracao = 0.2, volume = 0.8) {
+                if (!audioCtx) return;
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.type = 'square';          // onda quadrada = timbre de bip digital
+                    osc.frequency.value = frequencia;
+                    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duracao);
+                    osc.start(audioCtx.currentTime);
+                    osc.stop(audioCtx.currentTime + duracao);
+                } catch(e) {
+                    console.warn('Erro ao gerar bip:', e);
+                }
+            }
+
+            // Sequência de bips de alarme (3 bipes rápidos)
+            function tocarSequenciaBip() {
+                tocarBip(1046, 0.18, 0.9);                          // Dó5
+                setTimeout(() => tocarBip(1046, 0.18, 0.9), 280);   // Dó5
+                setTimeout(() => tocarBip(1318, 0.35, 0.9), 560);   // Mi5 (tom final mais longo)
+            }
+
+            // Objeto que simula a interface do <audio> anterior
+            const metarAlarmSound = {
+                _loop: false,
+                get loop() { return this._loop; },
+                set loop(v) { this._loop = v; },
+                play() {
+                    initAudioCtx();
+                    tocarSequenciaBip();
+                    if (this._loop) {
+                        // Repete a sequência a cada 4 segundos enquanto ativo
+                        if (!bipIntervalId) {
+                            bipIntervalId = setInterval(tocarSequenciaBip, 4000);
+                        }
+                    }
+                    return Promise.resolve();
+                },
+                pause() {
+                    if (bipIntervalId) {
+                        clearInterval(bipIntervalId);
+                        bipIntervalId = null;
+                    }
+                },
+                get currentTime() { return 0; },
+                set currentTime(v) { /* sem-op */ }
+            };
 
             function handleAudioActivation() {
-                const playPromise = metarAlarmSound.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(_ => {
-                        metarAlarmSound.pause();
-                        metarAlarmSound.currentTime = 0;
-                        console.log("Ativação de áudio bem-sucedida.");
-                    }).catch(error => {
-                        console.warn("O usuário precisa interagir com a página para ativar o áudio.", error);
-                    });
+                initAudioCtx();
+                // Resume o AudioContext se suspenso (política de autoplay do browser)
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
                 }
                 audioActivationOverlay.classList.remove('visible');
                 window.removeEventListener('click', handleAudioActivation);
