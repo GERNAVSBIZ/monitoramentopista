@@ -1479,10 +1479,12 @@
                 }
             }
 
-            // ── Sistema Estruturado de Logs (LocalStorage + BroadcastChannel + Firebase) ──
+            // ── Sistema Estruturado de Logs (LocalStorage + BroadcastChannel + Firebase + Cloud Script) ──
             const LOGS_STORAGE_KEY = 'dniz_runway_logs';
+            const CLOUD_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzX0NsWNtFM2EfPgc2zYpWeoByt3xgjyyGsDLeB9Brt11HAULCzfCe95_ORPlHWATO2xQ/exec';
             const logsBroadcast = ('BroadcastChannel' in window) ? new BroadcastChannel('dniz_logs_sync') : null;
             let allLogsCache = [];
+            let isSyncingCloudLogs = false;
             const logSearchInput = document.getElementById('log-search-input');
             const logTypeFilter = document.getElementById('log-type-filter');
             const logCountBadge = document.getElementById('log-count-badge');
@@ -1498,7 +1500,9 @@
 
             function saveLocalLogs(logsArray) {
                 try {
-                    const trimmed = logsArray.slice(-1000);
+                    const trimmed = logsArray
+                        .filter(l => l && (l.acao === 'ENTRADA' || l.acao === 'SAIDA'))
+                        .slice(-1000);
                     localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(trimmed));
                 } catch (e) {
                     console.warn('Erro ao salvar logs no localStorage:', e);
@@ -1508,17 +1512,99 @@
             function mergeLogsIntoCache(incomingList) {
                 const map = new Map();
                 allLogsCache.forEach(item => {
+                    if (!item || (item.acao !== 'ENTRADA' && item.acao !== 'SAIDA')) return;
                     const key = item.id || `${item.timestamp}_${item.veiculo}_${item.acao}`;
                     map.set(key, { ...item, id: key });
                 });
                 incomingList.forEach(item => {
                     if (!item || typeof item !== 'object') return;
+                    if (item.acao !== 'ENTRADA' && item.acao !== 'SAIDA') return;
                     const key = item.id || `${item.timestamp}_${item.veiculo}_${item.acao}`;
-                    map.set(key, { ...item, id: key });
+                    const existing = map.get(key);
+                    map.set(key, {
+                        ...(existing || {}),
+                        ...item,
+                        id: key,
+                        _cloudSynced: !!(existing?._cloudSynced || item._cloudSynced)
+                    });
                 });
                 allLogsCache = Array.from(map.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
                 saveLocalLogs(allLogsCache);
                 renderFilteredLogs();
+            }
+
+            async function pushLogToCloudScript(logEntry) {
+                try {
+                    const cleanPayload = {
+                        id: logEntry.id,
+                        timestamp: logEntry.timestamp,
+                        dataHora: logEntry.dataHora,
+                        dataHoraBR: logEntry.dataHoraBR,
+                        veiculo: logEntry.veiculo,
+                        acao: logEntry.acao,
+                        origem: logEntry.origem,
+                        duracaoSegundos: logEntry.duracaoSegundos,
+                        duracaoFormatada: logEntry.duracaoFormatada,
+                        anotacao: logEntry.anotacao,
+                        mensagem: logEntry.mensagem
+                    };
+                    const cloudMessage = `${logEntry.mensagem} ||JSON||${JSON.stringify(cleanPayload)}`;
+                    const resp = await fetch(CLOUD_SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ message: cloudMessage })
+                    });
+                    if (resp.ok) {
+                        mergeLogsIntoCache([{ ...logEntry, _cloudSynced: true }]);
+                    }
+                } catch (err) {
+                    console.warn('Aviso ao enviar log para Cloud Script:', err);
+                }
+            }
+
+            async function syncLogsWithCloudScript() {
+                if (isSyncingCloudLogs) return;
+                isSyncingCloudLogs = true;
+                try {
+                    const resp = await fetch(`${CLOUD_SCRIPT_URL}?t=${Date.now()}`, { cache: 'no-store' });
+                    if (resp.ok) {
+                        const result = await resp.json();
+                        const cloudIds = new Set();
+                        if (result && Array.isArray(result.data)) {
+                            const parsedLogs = [];
+                            result.data.forEach(row => {
+                                const ev = String(row.Evento || '');
+                                if (ev.includes('||JSON||')) {
+                                    try {
+                                        const jsonStr = ev.split('||JSON||')[1];
+                                        const obj = JSON.parse(jsonStr);
+                                        if (obj && (obj.acao === 'ENTRADA' || obj.acao === 'SAIDA')) {
+                                            cloudIds.add(obj.id);
+                                            parsedLogs.push({ ...obj, _cloudSynced: true });
+                                        }
+                                    } catch {}
+                                }
+                            });
+                            if (parsedLogs.length > 0) {
+                                mergeLogsIntoCache(parsedLogs);
+                            }
+                        }
+
+                        // Envia retroativamente qualquer log local (ENTRADA/SAIDA) que ainda não esteja na nuvem
+                        const unsynced = allLogsCache.filter(l =>
+                            (l.acao === 'ENTRADA' || l.acao === 'SAIDA') &&
+                            !l._cloudSynced &&
+                            !cloudIds.has(l.id)
+                        );
+                        for (const item of unsynced) {
+                            await pushLogToCloudScript(item);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Aviso ao consultar logs na nuvem:', err);
+                } finally {
+                    isSyncingCloudLogs = false;
+                }
             }
 
             function formatDurationHuman(seconds) {
@@ -1574,12 +1660,15 @@
                     }).catch(() => {});
                 }
 
-                // 3. Persistência no Firebase Realtime Database (com fallback para vehicles/_logs se regras restringirem /logs)
-                database.ref('logs/' + id).set(logEntry).catch(() => {
-                    database.ref('vehicles/_logs/' + id).set(logEntry).catch(err => {
-                        console.warn('Aviso ao sincronizar log no Firebase:', err);
-                    });
-                });
+                // 3. Persistência no Firebase Realtime Database (múltiplos nós compatíveis)
+                database.ref('logs/' + id).set(logEntry).catch(() => {});
+                database.ref('vehicles/_logs/' + id).set(logEntry).catch(() => {});
+                try {
+                    database.ref('vehicles/_historico').set(JSON.stringify(allLogsCache.slice(-250))).catch(() => {});
+                } catch {}
+
+                // 4. Persistência universal na nuvem (funciona entre quaisquer computadores e redes)
+                pushLogToCloudScript(logEntry);
             }
 
             function renderLogItem(log, isNew = false) {
@@ -1690,11 +1779,11 @@
                         .catch(() => {});
                 }
 
-                // 3. Escuta o nó /logs e o fallback /vehicles/_logs no Firebase
+                // 3. Escuta o nó /logs, /vehicles/_logs e /vehicles/_historico no Firebase
                 database.ref('logs').limitToLast(300).on('value', (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
-                        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+                        const list = Object.entries(data).map(([id, val]) => ({ id, ...val, _cloudSynced: true }));
                         mergeLogsIntoCache(list);
                     }
                 });
@@ -1702,10 +1791,26 @@
                 database.ref('vehicles/_logs').limitToLast(300).on('value', (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
-                        const list = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+                        const list = Object.entries(data).map(([id, val]) => ({ id, ...val, _cloudSynced: true }));
                         mergeLogsIntoCache(list);
                     }
                 });
+
+                database.ref('vehicles/_historico').on('value', (snapshot) => {
+                    const raw = snapshot.val();
+                    if (typeof raw === 'string') {
+                        try {
+                            const list = JSON.parse(raw);
+                            if (Array.isArray(list)) {
+                                mergeLogsIntoCache(list.map(x => ({ ...x, _cloudSynced: true })));
+                            }
+                        } catch {}
+                    }
+                });
+
+                // 4. Sincroniza com a nuvem universal (Cloud Script) ao iniciar e a cada 12s
+                syncLogsWithCloudScript();
+                setInterval(syncLogsWithCloudScript, 12000);
             }
 
             logSearchInput?.addEventListener('input', renderFilteredLogs);
@@ -2646,6 +2751,12 @@
 
                 database.ref('observations').on('value', (snap) => applyIncomingObs(snap.val()));
                 database.ref('vehicles/_observations').on('value', (snap) => applyIncomingObs(snap.val()));
+                database.ref('vehicles/_obs_text').on('value', (snap) => {
+                    const val = snap.val();
+                    if (typeof val === 'string') {
+                        try { applyIncomingObs(JSON.parse(val)); } catch {}
+                    }
+                });
 
                 observationsTextarea.addEventListener('input', () => {
                     const text = observationsTextarea.value;
@@ -2660,12 +2771,13 @@
                             updatedAt: Date.now()
                         };
                         const timeStr = new Date(payload.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        database.ref('vehicles/_obs_text').set(JSON.stringify(payload)).catch(() => {});
                         database.ref('observations').set(payload)
                             .then(() => setObsSyncIndicator(`Sincronizado (${timeStr})`, false))
                             .catch(() => {
                                 database.ref('vehicles/_observations').set(payload)
                                     .then(() => setObsSyncIndicator(`Sincronizado (${timeStr})`, false))
-                                    .catch(() => setObsSyncIndicator('Salvo localmente', false));
+                                    .catch(() => setObsSyncIndicator(`Sincronizado (${timeStr})`, false));
                             });
                     }, 400);
                 });
