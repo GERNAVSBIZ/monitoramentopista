@@ -1154,11 +1154,9 @@
                         <input type="text" id="log-search-input" class="log-filter-input" placeholder="Buscar viatura, ação ou anotação...">
                     </div>
                     <select id="log-type-filter" class="log-filter-select">
-                        <option value="TODOS">Todos os Eventos</option>
-                        <option value="PISTA">Apenas Pista (Entrada/Saída)</option>
+                        <option value="TODOS">Todos (Entrada e Saída)</option>
                         <option value="ENTRADA">Apenas Entradas</option>
                         <option value="SAIDA">Apenas Saídas</option>
-                        <option value="PATIO">Pátio / Outros</option>
                     </select>
                 </div>
                 <div id="log-area" class="log-area">
@@ -1539,15 +1537,12 @@
             }
 
             function registrarLog({ veiculo, acao, origem = 'COMANDO', duracaoSegundos = null, anotacao = '' }) {
+                if (acao !== 'ENTRADA' && acao !== 'SAIDA') return;
+
                 const now = new Date();
                 const duracaoFormatada = duracaoSegundos !== null ? formatDurationHuman(duracaoSegundos) : null;
 
-                let acaoTexto = acao;
-                if (acao === 'ENTRADA') acaoTexto = 'ENTROU na pista';
-                else if (acao === 'SAIDA') acaoTexto = 'SAIU da pista';
-                else if (acao === 'PATIO') acaoTexto = 'adicionado ao pátio';
-                else if (acao === 'DUPLICADO') acaoTexto = 'duplicado no pátio';
-                else if (acao === 'REMOVIDO') acaoTexto = 'removido do mapa';
+                const acaoTexto = acao === 'ENTRADA' ? 'ENTROU na pista' : 'SAIU da pista';
 
                 const id = `log_${now.getTime()}_${Math.random().toString(36).slice(2, 7)}`;
                 const logEntry = {
@@ -1556,7 +1551,7 @@
                     dataHora: now.toISOString(),
                     dataHoraBR: now.toLocaleString('pt-BR'),
                     veiculo: veiculo || 'DESCONHECIDO',
-                    acao: acao, // 'ENTRADA' | 'SAIDA' | 'PATIO' | 'DUPLICADO' | 'REMOVIDO'
+                    acao: acao, // 'ENTRADA' | 'SAIDA'
                     origem: origem, // 'MOBILE' | 'COMANDO'
                     duracaoSegundos: duracaoSegundos !== null ? Math.round(duracaoSegundos) : null,
                     duracaoFormatada: duracaoFormatada,
@@ -1646,10 +1641,9 @@
                 const typeVal = logTypeFilter?.value || 'TODOS';
 
                 const filtered = allLogsCache.filter(log => {
-                    if (typeVal === 'PISTA' && log.acao !== 'ENTRADA' && log.acao !== 'SAIDA') return false;
+                    if (log.acao !== 'ENTRADA' && log.acao !== 'SAIDA') return false;
                     if (typeVal === 'ENTRADA' && log.acao !== 'ENTRADA') return false;
                     if (typeVal === 'SAIDA' && log.acao !== 'SAIDA') return false;
-                    if (typeVal === 'PATIO' && (log.acao === 'ENTRADA' || log.acao === 'SAIDA')) return false;
 
                     if (searchVal) {
                         const haystack = `${log.veiculo || ''} ${log.acao || ''} ${log.origem || ''} ${log.anotacao || ''} ${log.dataHoraBR || ''}`.toLowerCase();
@@ -1836,12 +1830,6 @@
                     const textNode = group.findOne('.annotation-text');
                     const anot = textNode ? textNode.text() : '';
                     addDraggableIcon(image.attrs.imageUrl, image.name(), group.x() + 20, group.y() + 20, anot);
-                    registrarLog({
-                        veiculo: image.name(),
-                        acao: 'DUPLICADO',
-                        origem: 'COMANDO',
-                        anotacao: anot
-                    });
                     saveIconsState();
                 }
             }
@@ -1866,13 +1854,6 @@
                             acao: 'SAIDA',
                             origem: group.attrs.isAutoFiscal ? 'MOBILE' : 'COMANDO',
                             duracaoSegundos: duracaoSegundos,
-                            anotacao: anot
-                        });
-                    } else {
-                        registrarLog({
-                            veiculo: iconType,
-                            acao: 'REMOVIDO',
-                            origem: 'COMANDO',
                             anotacao: anot
                         });
                     }
@@ -2214,11 +2195,6 @@
             document.querySelectorAll('.icon-palette .icon-item').forEach(item => {
                 item.addEventListener('click', () => {
                     addDraggableIcon(item.dataset.imageUrl, item.dataset.iconType);
-                    registrarLog({
-                        veiculo: item.dataset.iconType,
-                        acao: 'PATIO',
-                        origem: 'COMANDO'
-                    });
                     saveIconsState();
                 });
             });
