@@ -157,11 +157,9 @@
                 <div>
                     <label for="action-filter" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Tipo de Evento</label>
                     <select id="action-filter" class="form-control">
-                        <option value="TODOS">Todos os Eventos</option>
-                        <option value="PISTA">Apenas Pista (Entrada/Saída)</option>
+                        <option value="TODOS">Todos (Entrada e Saída)</option>
                         <option value="ENTRADA">Apenas Entradas</option>
                         <option value="SAIDA">Apenas Saídas</option>
-                        <option value="PATIO">Pátio / Outros</option>
                     </select>
                 </div>
             </div>
@@ -331,15 +329,14 @@
                 const selectedOrigin = originFilterSelect.value;
 
                 currentFilteredLogs = allLogs.filter(log => {
+                    if (log.acao !== 'ENTRADA' && log.acao !== 'SAIDA') return false;
                     const ts = log.timestamp || 0;
                     if (startMs && ts < startMs) return false;
                     if (endMs && ts > endMs) return false;
                     if (selectedItem !== 'TODOS' && log.veiculo !== selectedItem) return false;
 
-                    if (selectedAction === 'PISTA' && log.acao !== 'ENTRADA' && log.acao !== 'SAIDA') return false;
                     if (selectedAction === 'ENTRADA' && log.acao !== 'ENTRADA') return false;
                     if (selectedAction === 'SAIDA' && log.acao !== 'SAIDA') return false;
-                    if (selectedAction === 'PATIO' && (log.acao === 'ENTRADA' || log.acao === 'SAIDA')) return false;
 
                     if (selectedOrigin !== 'TODAS' && log.origem !== selectedOrigin) return false;
 
