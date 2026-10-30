@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Consultas e Relatórios - Monitoramento de Pista</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBJwvh4kJ1XCsU6fQriJh6d4gxoQrkM5kk",
+            authDomain: "movimento-pista.firebaseapp.com",
+            databaseURL: "https://movimento-pista-default-rtdb.firebaseio.com",
+            projectId: "movimento-pista",
+            storageBucket: "movimento-pista.firebasestorage.app",
+            messagingSenderId: "272997617852",
+            appId: "1:272997617852:web:ce5f4d9165d8337a9ec0b9"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        .glass-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25);
+        }
+        .form-control {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            color: #f8fafc;
+            border-radius: 0.5rem;
+            padding: 0.55rem 0.85rem;
+            font-size: 0.875rem;
+            width: 100%;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .quick-period-btn {
+            padding: 0.4rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-period-btn:hover, .quick-period-btn.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .table-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .table-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- Cabeçalho -->
+        <header class="glass-card p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-t-4 border-t-blue-500">
+            <div>
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-bolt text-blue-400 text-2xl"></i>
+                    <h1 class="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+                        Central de Consultas e Histórico de Pista
+                    </h1>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        TEMPO REAL
+                    </span>
+                </div>
+                <p id="report-period" class="text-sm text-slate-400 mt-1">
+                    Sincronizado diretamente com o Firebase Realtime Database
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <button id="export-csv-btn" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm flex items-center gap-2 shadow transition">
+                    <i class="fas fa-file-csv"></i>
+                    Exportar CSV
+                </button>
+                <a href="index.html" class="px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-sm flex items-center gap-2 transition">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar à Sala Rádio
+                </a>
+            </div>
+        </header>
+
+        <!-- Barra de Filtros Rápidos e Pesquisa -->
+        <section class="glass-card p-6 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-700/70">
+                <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                    <i class="fas fa-filter text-blue-400"></i>
+                    <span>Filtros de Consulta Rápida</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs text-slate-400 mr-1">Período rápido:</span>
+                    <button type="button" data-period="hoje" class="quick-period-btn">Hoje</button>
+                    <button type="button" data-period="24h" class="quick-period-btn">Últimas 24h</button>
+                    <button type="button" data-period="7d" class="quick-period-btn">Últimos 7 dias</button>
+                    <button type="button" data-period="30d" class="quick-period-btn">Últimos 30 dias</button>
+                    <button type="button" data-period="tudo" class="quick-period-btn active">Todo o Histórico</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+                <div class="lg:col-span-2">
+                    <label for="search-input" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Busca Livre</label>
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                        <input type="text" id="search-input" class="form-control pl-9" placeholder="Buscar viatura, ação, anotação, data...">
+                    </div>
+                </div>
+                <div>
+                    <label for="start-datetime" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Data/Hora Início</label>
+                    <input type="datetime-local" id="start-datetime" class="form-control">
+                </div>
+                <div>
+                    <label for="end-datetime" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Data/Hora Fim</label>
+                    <input type="datetime-local" id="end-datetime" class="form-control">
+                </div>
+                <div>
+                    <label for="item-filter" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Viatura / Item</label>
+                    <select id="item-filter" class="form-control">
+                        <option value="TODOS">Todas as Viaturas</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="action-filter" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Tipo de Evento</label>
+                    <select id="action-filter" class="form-control">
+                        <option value="TODOS">Todos os Eventos</option>
+                        <option value="PISTA">Apenas Pista (Entrada/Saída)</option>
+                        <option value="ENTRADA">Apenas Entradas</option>
+                        <option value="SAIDA">Apenas Saídas</option>
+                        <option value="PATIO">Pátio / Outros</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <div class="flex items-center gap-3">
+                    <label for="origin-filter" class="text-xs font-semibold text-slate-400 uppercase">Origem:</label>
+                    <select id="origin-filter" class="form-control" style="width: auto; min-width: 170px;">
+                        <option value="TODAS">Todas as Origens</option>
+                        <option value="MOBILE">📱 Mobile Fiscal</option>
+                        <option value="COMANDO">📻 Sala Rádio</option>
+                    </select>
+                </div>
+                <button id="clear-filters-btn" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5">
+                    <i class="fas fa-rotate-left"></i>
+                    Limpar Todos os Filtros
+                </button>
+            </div>
+        </section>
+
+        <!-- Cards de Indicadores (KPIs) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="glass-card p-5 text-center border-l-4 border-l-red-500">
+                <div id="kpi-total-entradas" class="text-3xl font-extrabold text-red-400">0</div>
+                <div class="text-xs font-semibold text-slate-400 uppercase mt-1">Entradas na Pista</div>
+            </div>
+            <div class="glass-card p-5 text-center border-l-4 border-l-amber-500">
+                <div id="kpi-tempo-total" class="text-3xl font-extrabold text-amber-400">0s</div>
+                <div class="text-xs font-semibold text-slate-400 uppercase mt-1">Tempo Total Ocupado</div>
+            </div>
+            <div class="glass-card p-5 text-center border-l-4 border-l-emerald-500">
+                <div id="kpi-tempo-medio" class="text-3xl font-extrabold text-emerald-400">0s</div>
+                <div class="text-xs font-semibold text-slate-400 uppercase mt-1">Tempo Médio / Ocupação</div>
+            </div>
+            <div class="glass-card p-5 text-center border-l-4 border-l-blue-500">
+                <div id="kpi-item-frequente" class="text-2xl font-extrabold text-blue-400 truncate">N/D</div>
+                <div class="text-xs font-semibold text-slate-400 uppercase mt-1">Viatura Mais Frequente</div>
+            </div>
+            <div class="glass-card p-5 text-center border-l-4 border-l-purple-500">
+                <div id="kpi-hora-pico" class="text-3xl font-extrabold text-purple-400">--:--</div>
+                <div class="text-xs font-semibold text-slate-400 uppercase mt-1">Horário de Pico</div>
+            </div>
+        </section>
+
+        <!-- Tabela Detalhada de Eventos (Consulta Sólida) -->
+        <section class="glass-card overflow-hidden">
+            <div class="p-5 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-list-check text-blue-400"></i>
+                    <h2 class="text-lg font-bold text-white">Registros Detalhados de Eventos</h2>
+                    <span id="table-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                        0 registros
+                    </span>
+                </div>
+                <span class="text-xs text-slate-400">Ordenado do mais recente para o mais antigo</span>
+            </div>
+
+            <div class="table-scroll overflow-x-auto max-h-[480px] overflow-y-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-900/90 text-slate-400 text-xs uppercase sticky top-0 z-10 backdrop-blur">
+                        <tr>
+                            <th class="py-3.5 px-4 font-semibold">Data e Hora</th>
+                            <th class="py-3.5 px-4 font-semibold">Viatura / Equipamento</th>
+                            <th class="py-3.5 px-4 font-semibold">Evento</th>
+                            <th class="py-3.5 px-4 font-semibold">Origem</th>
+                            <th class="py-3.5 px-4 font-semibold">Tempo de Pista</th>
+                            <th class="py-3.5 px-4 font-semibold">Observação / Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table-body" class="divide-y divide-slate-800 text-sm">
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-slate-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i> Carregando registros do Firebase...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Gráficos Analíticos -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="glass-card p-5 flex flex-col">
+                <h3 class="text-sm font-bold text-slate-300 uppercase mb-4 flex items-center gap-2">
+                    <i class="fas fa-chart-pie text-blue-400"></i>
+                    Entradas por Viatura
+                </h3>
+                <div class="relative flex-grow min-h-[280px]">
+                    <canvas id="entradas-chart"></canvas>
+                </div>
+            </div>
+            <div class="glass-card p-5 flex flex-col">
+                <h3 class="text-sm font-bold text-slate-300 uppercase mb-4 flex items-center gap-2">
+                    <i class="fas fa-stopwatch text-amber-400"></i>
+                    Tempo Total na Pista por Viatura (min)
+                </h3>
+                <div class="relative flex-grow min-h-[280px]">
+                    <canvas id="tempo-chart"></canvas>
+                </div>
+            </div>
+            <div class="glass-card p-5 flex flex-col">
+                <h3 class="text-sm font-bold text-slate-300 uppercase mb-4 flex items-center gap-2">
+                    <i class="fas fa-clock text-emerald-400"></i>
+                    Entradas por Hora do Dia
+                </h3>
+                <div class="relative flex-grow min-h-[280px]">
+                    <canvas id="horas-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('search-input');
+            const startDatetimeInput = document.getElementById('start-datetime');
+            const endDatetimeInput = document.getElementById('end-datetime');
+            const itemFilterSelect = document.getElementById('item-filter');
+            const actionFilterSelect = document.getElementById('action-filter');
+            const originFilterSelect = document.getElementById('origin-filter');
+            const clearFiltersBtn = document.getElementById('clear-filters-btn');
+            const exportCsvBtn = document.getElementById('export-csv-btn');
+            const quickPeriodBtns = document.querySelectorAll('.quick-period-btn');
+
+            let allLogs = [];
+            let currentFilteredLogs = [];
+            let entradasChartInstance = null;
+            let tempoChartInstance = null;
+            let horasChartInstance = null;
+
+            function formatDurationHuman(seconds) {
+                if (seconds == null || isNaN(seconds) || seconds <= 0) return '0s';
+                const s = Math.round(seconds);
+                const hrs = Math.floor(s / 3600);
+                const mins = Math.floor((s % 3600) / 60);
+                const secs = s % 60;
+                if (hrs > 0) return `${hrs}h ${String(mins).padStart(2, '0')}m`;
+                if (mins > 0) return `${mins}m ${String(secs).padStart(2, '0')}s`;
+                return `${secs}s`;
+            }
+
+            function populateVehicleDropdown(logs) {
+                const currentSelected = itemFilterSelect.value;
+                const defaultVehicles = ['VIATURA', 'ELETRICA', 'FAISCA1', 'FAISCA2', 'FAISCA3', 'MANUTENCAO1', 'MANUTENÇÃO2', 'PCM', 'VM1', 'VO1', 'AERONAVE'];
+                const fromLogs = logs.map(l => l.veiculo).filter(Boolean);
+                const unique = [...new Set([...defaultVehicles, ...fromLogs])].sort();
+
+                itemFilterSelect.innerHTML = '<option value="TODOS">Todas as Viaturas</option>';
+                unique.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v;
+                    opt.textContent = v;
+                    itemFilterSelect.appendChild(opt);
+                });
+                if ([...itemFilterSelect.options].some(o => o.value === currentSelected)) {
+                    itemFilterSelect.value = currentSelected;
+                }
+            }
+
+            function applyFilters() {
+                const query = (searchInput.value || '').trim().toLowerCase();
+                const startMs = startDatetimeInput.value ? new Date(startDatetimeInput.value).getTime() : null;
+                const endMs = endDatetimeInput.value ? new Date(endDatetimeInput.value).getTime() : null;
+                const selectedItem = itemFilterSelect.value;
+                const selectedAction = actionFilterSelect.value;
+                const selectedOrigin = originFilterSelect.value;
+
+                currentFilteredLogs = allLogs.filter(log => {
+                    const ts = log.timestamp || 0;
+                    if (startMs && ts < startMs) return false;
+                    if (endMs && ts > endMs) return false;
+                    if (selectedItem !== 'TODOS' && log.veiculo !== selectedItem) return false;
+
+                    if (selectedAction === 'PISTA' && log.acao !== 'ENTRADA' && log.acao !== 'SAIDA') return false;
+                    if (selectedAction === 'ENTRADA' && log.acao !== 'ENTRADA') return false;
+                    if (selectedAction === 'SAIDA' && log.acao !== 'SAIDA') return false;
+                    if (selectedAction === 'PATIO' && (log.acao === 'ENTRADA' || log.acao === 'SAIDA')) return false;
+
+                    if (selectedOrigin !== 'TODAS' && log.origem !== selectedOrigin) return false;
+
+                    if (query) {
+                        const text = `${log.veiculo || ''} ${log.acao || ''} ${log.origem || ''} ${log.anotacao || ''} ${log.dataHoraBR || ''} ${log.duracaoFormatada || ''}`.toLowerCase();
+                        if (!text.includes(query)) return false;
+                    }
+                    return true;
+                }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                renderDashboard(currentFilteredLogs);
+            }
+
+            function renderDashboard(data) {
+                document.getElementById('table-count-badge').textContent = `${data.length} registro${data.length === 1 ? '' : 's'}`;
+
+                const entradas = data.filter(d => d.acao === 'ENTRADA');
+                const saidasComTempo = data.filter(d => d.acao === 'SAIDA' && typeof d.duracaoSegundos === 'number');
+
+                const totalSegundos = saidasComTempo.reduce((acc, cur) => acc + (cur.duracaoSegundos || 0), 0);
+                const mediaSegundos = saidasComTempo.length > 0 ? Math.round(totalSegundos / saidasComTempo.length) : 0;
+
+                const tipoCounts = {};
+                const horaCounts = {};
+                entradas.forEach(e => {
+                    const v = e.veiculo || 'OUTROS';
+                    tipoCounts[v] = (tipoCounts[v] || 0) + 1;
+                    if (e.timestamp) {
+                        const h = new Date(e.timestamp).getHours();
+                        horaCounts[h] = (horaCounts[h] || 0) + 1;
+                    }
+                });
+
+                const tempoPorVeiculoMin = {};
+                saidasComTempo.forEach(s => {
+                    const v = s.veiculo || 'OUTROS';
+                    tempoPorVeiculoMin[v] = +((tempoPorVeiculoMin[v] || 0) + (s.duracaoSegundos / 60)).toFixed(1);
+                });
+
+                const itemMaisFrequente = Object.keys(tipoCounts).length > 0
+                    ? Object.keys(tipoCounts).reduce((a, b) => tipoCounts[a] >= tipoCounts[b] ? a : b)
+                    : 'N/D';
+
+                const horaPico = Object.keys(horaCounts).length > 0
+                    ? Object.keys(horaCounts).reduce((a, b) => horaCounts[a] >= horaCounts[b] ? a : b)
+                    : null;
+
+                document.getElementById('kpi-total-entradas').textContent = entradas.length;
+                document.getElementById('kpi-tempo-total').textContent = formatDurationHuman(totalSegundos);
+                document.getElementById('kpi-tempo-medio').textContent = formatDurationHuman(mediaSegundos);
+                document.getElementById('kpi-item-frequente').textContent = itemMaisFrequente;
+                document.getElementById('kpi-hora-pico').textContent = horaPico !== null ? `${String(horaPico).padStart(2, '0')}:00` : '--:--';
+
+                renderTable(data);
+                renderCharts(tipoCounts, tempoPorVeiculoMin, horaCounts);
+            }
+
+            function renderTable(data) {
+                const tbody = document.getElementById('logs-table-body');
+                tbody.innerHTML = '';
+
+                if (data.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="py-10 text-center text-slate-500">
+                                <i class="fas fa-inbox text-2xl mb-2 block"></i>
+                                Nenhum registro encontrado para os filtros aplicados.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                data.forEach(log => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-800/60 transition';
+
+                    const dataStr = log.dataHoraBR || (log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '-');
+                    const acao = log.acao || 'PATIO';
+
+                    let acaoBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">${acao}</span>`;
+                    if (acao === 'ENTRADA') {
+                        acaoBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30"><i class="fas fa-arrow-right-to-bracket mr-1"></i>ENTRADA PISTA</span>`;
+                    } else if (acao === 'SAIDA') {
+                        acaoBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"><i class="fas fa-check-circle mr-1"></i>SAÍDA PISTA</span>`;
+                    }
+
+                    const origemHtml = log.origem === 'MOBILE'
+                        ? `<span class="text-xs font-semibold text-cyan-300"><i class="fas fa-mobile-screen-button mr-1"></i>Mobile Fiscal</span>`
+                        : `<span class="text-xs font-semibold text-slate-300"><i class="fas fa-tower-broadcast mr-1"></i>Sala Rádio</span>`;
+
+                    const duracaoHtml = log.duracaoFormatada
+                        ? `<span class="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30"><i class="fas fa-stopwatch mr-1"></i>${log.duracaoFormatada}</span>`
+                        : `<span class="text-slate-600">-</span>`;
+
+                    const obsText = (log.anotacao && !log.anotacao.endsWith('(Auto)')) ? log.anotacao : '-';
+
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-mono text-xs text-slate-300 whitespace-nowrap">${dataStr}</td>
+                        <td class="py-3 px-4 font-bold text-white whitespace-nowrap">${log.veiculo || '-'}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">${acaoBadge}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">${origemHtml}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">${duracaoHtml}</td>
+                        <td class="py-3 px-4 text-slate-300 text-xs">${obsText}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            function renderCharts(tipoCounts, tempoPorVeiculoMin, horaCounts) {
+                if (entradasChartInstance) entradasChartInstance.destroy();
+                if (tempoChartInstance) tempoChartInstance.destroy();
+                if (horasChartInstance) horasChartInstance.destroy();
+
+                const ctxEntradas = document.getElementById('entradas-chart').getContext('2d');
+                entradasChartInstance = new Chart(ctxEntradas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(tipoCounts).length ? Object.keys(tipoCounts) : ['Sem dados'],
+                        datasets: [{
+                            data: Object.keys(tipoCounts).length ? Object.values(tipoCounts) : [1],
+                            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'],
+                            borderColor: '#1e293b',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12 } }
+                        }
+                    }
+                });
+
+                const ctxTempo = document.getElementById('tempo-chart').getContext('2d');
+                tempoChartInstance = new Chart(ctxTempo, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(tempoPorVeiculoMin).length ? Object.keys(tempoPorVeiculoMin) : ['Sem dados'],
+                        datasets: [{
+                            label: 'Minutos Ocupados',
+                            data: Object.keys(tempoPorVeiculoMin).length ? Object.values(tempoPorVeiculoMin) : [0],
+                            backgroundColor: '#f59e0b',
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: '#cbd5e1' }, grid: { display: false } },
+                            y: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.1)' } }
+                        }
+                    }
+                });
+
+                const ctxHoras = document.getElementById('horas-chart').getContext('2d');
+                const labelsHoras = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}h`);
+                const dataHoras = labelsHoras.map((_, idx) => horaCounts[idx] || 0);
+
+                horasChartInstance = new Chart(ctxHoras, {
+                    type: 'line',
+                    data: {
+                        labels: labelsHoras,
+                        datasets: [{
+                            label: 'Entradas',
+                            data: dataHoras,
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            borderColor: '#10b981',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.25
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: '#cbd5e1' }, grid: { display: false } },
+                            y: { beginAtZero: true, ticks: { stepSize: 1, color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.1)' } }
+                        }
+                    }
+                });
+            }
+
+            // Botões de Período Rápido
+            quickPeriodBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    quickPeriodBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    const period = btn.dataset.period;
+                    const now = new Date();
+                    const toLocalISO = (d) => {
+                        const pad = (n) => String(n).padStart(2, '0');
+                        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    };
+
+                    if (period === 'tudo') {
+                        startDatetimeInput.value = '';
+                        endDatetimeInput.value = '';
+                    } else if (period === 'hoje') {
+                        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0);
+                        startDatetimeInput.value = toLocalISO(startOfDay);
+                        endDatetimeInput.value = '';
+                    } else if (period === '24h') {
+                        startDatetimeInput.value = toLocalISO(new Date(now.getTime() - 24 * 3600 * 1000));
+                        endDatetimeInput.value = '';
+                    } else if (period === '7d') {
+                        startDatetimeInput.value = toLocalISO(new Date(now.getTime() - 7 * 24 * 3600 * 1000));
+                        endDatetimeInput.value = '';
+                    } else if (period === '30d') {
+                        startDatetimeInput.value = toLocalISO(new Date(now.getTime() - 30 * 24 * 3600 * 1000));
+                        endDatetimeInput.value = '';
+                    }
+                    applyFilters();
+                });
+            });
+
+            // Eventos de Filtro Instantâneo
+            searchInput.addEventListener('input', applyFilters);
+            startDatetimeInput.addEventListener('change', () => {
+                quickPeriodBtns.forEach(b => b.classList.remove('active'));
+                applyFilters();
+            });
+            endDatetimeInput.addEventListener('change', () => {
+                quickPeriodBtns.forEach(b => b.classList.remove('active'));
+                applyFilters();
+            });
+            itemFilterSelect.addEventListener('change', applyFilters);
+            actionFilterSelect.addEventListener('change', applyFilters);
+            originFilterSelect.addEventListener('change', applyFilters);
+
+            clearFiltersBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                startDatetimeInput.value = '';
+                endDatetimeInput.value = '';
+                itemFilterSelect.value = 'TODOS';
+                actionFilterSelect.value = 'TODOS';
+                originFilterSelect.value = 'TODAS';
+                quickPeriodBtns.forEach(b => b.classList.toggle('active', b.dataset.period === 'tudo'));
+                applyFilters();
+            });
+
+            // Exportação para CSV (Excel)
+            exportCsvBtn.addEventListener('click', () => {
+                if (currentFilteredLogs.length === 0) {
+                    alert('Não há registros filtrados para exportar.');
+                    return;
+                }
+                const headers = ['Data/Hora', 'Viatura', 'Acao', 'Origem', 'Duracao (Segundos)', 'Duracao Formatada', 'Anotacao'];
+                const rows = currentFilteredLogs.map(l => [
+                    `"${(l.dataHoraBR || '').replace(/"/g, '""')}"`,
+                    `"${(l.veiculo || '').replace(/"/g, '""')}"`,
+                    `"${(l.acao || '').replace(/"/g, '""')}"`,
+                    `"${(l.origem || '').replace(/"/g, '""')}"`,
+                    l.duracaoSegundos ?? '',
+                    `"${(l.duracaoFormatada || '').replace(/"/g, '""')}"`,
+                    `"${(l.anotacao || '').replace(/"/g, '""')}"`
+                ]);
+                const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `historico_pista_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            // ── Sincronização Multi-Camada (LocalStorage + BroadcastChannel + Servidor Local + Firebase) ──
+            const LOGS_STORAGE_KEY = 'dniz_runway_logs';
+
+            function mergeLogs(incomingList) {
+                const map = new Map();
+                allLogs.forEach(item => {
+                    if (!item || typeof item !== 'object') return;
+                    const key = item.id || `${item.timestamp}_${item.veiculo}_${item.acao}`;
+                    map.set(key, { ...item, id: key });
+                });
+                incomingList.forEach(item => {
+                    if (!item || typeof item !== 'object') return;
+                    const key = item.id || `${item.timestamp}_${item.veiculo}_${item.acao}`;
+                    map.set(key, { ...item, id: key });
+                });
+                allLogs = Array.from(map.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                try {
+                    localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(allLogs.slice(-1000)));
+                } catch {}
+                populateVehicleDropdown(allLogs);
+                applyFilters();
+            }
+
+            // 1. Carrega imediatamente do localStorage (0ms)
+            try {
+                const savedLocal = localStorage.getItem(LOGS_STORAGE_KEY);
+                if (savedLocal) {
+                    mergeLogs(JSON.parse(savedLocal));
+                } else {
+                    applyFilters();
+                }
+            } catch {
+                applyFilters();
+            }
+
+            // 2. Escuta eventos em tempo real de outras abas (BroadcastChannel + storage event)
+            if ('BroadcastChannel' in window) {
+                const bc = new BroadcastChannel('dniz_logs_sync');
+                bc.onmessage = (ev) => {
+                    if (ev.data && ev.data.type === 'NEW_LOG' && ev.data.log) {
+                        mergeLogs([ev.data.log]);
+                    }
+                };
+            }
+            window.addEventListener('storage', (ev) => {
+                if (ev.key === LOGS_STORAGE_KEY && ev.newValue) {
+                    try {
+                        mergeLogs(JSON.parse(ev.newValue));
+                    } catch {}
+                }
+            });
+
+            // 3. Se estiver rodando localmente, busca também do servidor Python (/api/logs)
+            if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+                fetch('/api/logs')
+                    .then(r => r.ok ? r.json() : null)
+                    .then(res => {
+                        if (res && Array.isArray(res.logs)) {
+                            mergeLogs(res.logs);
+                        }
+                    })
+                    .catch(() => {});
+            }
+
+            // 4. Listener em Tempo Real do Firebase (/logs e fallback /vehicles/_logs)
+            database.ref('logs').on('value', (snapshot) => {
+                const raw = snapshot.val();
+                if (raw) {
+                    const list = Object.entries(raw).map(([id, item]) => ({ id, ...item }));
+                    mergeLogs(list);
+                }
+            });
+
+            database.ref('vehicles/_logs').on('value', (snapshot) => {
+                const raw = snapshot.val();
+                if (raw) {
+                    const list = Object.entries(raw).map(([id, item]) => ({ id, ...item }));
+                    mergeLogs(list);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

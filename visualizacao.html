@@ -653,6 +653,7 @@
             const todosQuem = new Set([...Object.keys(currentVehicles), ...Object.keys(novo)]);
 
             todosQuem.forEach(quem => {
+                if (quem.startsWith('_')) return;
                 const statusAnterior = currentVehicles[quem] || 'LIVRE';
                 const novoStatus = novo[quem] || 'LIVRE';
                 const info = iconMapping[quem] || { label: quem };

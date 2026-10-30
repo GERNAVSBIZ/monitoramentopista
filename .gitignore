@@ -1,5 +1,6 @@
 # Servidor de teste local (não necessário em produção)
 test_server.py
+logs_db.json
 
 # Backups e versões antigas
 index250911.html
@@ -12,9 +13,7 @@ index_melhorado_numeracao.html
 index_teste.html
 index_teste_numeracao.html
 indexNotam.html
-index_melhorado_numeracao.html
 monitoramento_relatorio1.html
-relatorio_monitoramento.html
 
 # Sistema operacional
 .DS_Store
