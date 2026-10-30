@@ -1,6 +1,7 @@
-# Servidor de teste local (não necessário em produção)
+# Servidor de teste local e scripts auxiliares (não necessário em produção)
 test_server.py
 logs_db.json
+atualizar_github.bat
 
 # Backups e versões antigas
 index250911.html
