@@ -157,11 +157,9 @@
                 <div>
                     <label for="action-filter" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Tipo de Evento</label>
                     <select id="action-filter" class="form-control">
-                        <option value="TODOS">Todos os Eventos</option>
-                        <option value="PISTA">Apenas Pista (Entrada/Saída)</option>
+                        <option value="TODOS">Todos (Entrada e Saída)</option>
                         <option value="ENTRADA">Apenas Entradas</option>
                         <option value="SAIDA">Apenas Saídas</option>
-                        <option value="PATIO">Pátio / Outros</option>
                     </select>
                 </div>
             </div>
@@ -331,15 +329,14 @@
                 const selectedOrigin = originFilterSelect.value;
 
                 currentFilteredLogs = allLogs.filter(log => {
+                    if (log.acao !== 'ENTRADA' && log.acao !== 'SAIDA') return false;
                     const ts = log.timestamp || 0;
                     if (startMs && ts < startMs) return false;
                     if (endMs && ts > endMs) return false;
                     if (selectedItem !== 'TODOS' && log.veiculo !== selectedItem) return false;
 
-                    if (selectedAction === 'PISTA' && log.acao !== 'ENTRADA' && log.acao !== 'SAIDA') return false;
                     if (selectedAction === 'ENTRADA' && log.acao !== 'ENTRADA') return false;
                     if (selectedAction === 'SAIDA' && log.acao !== 'SAIDA') return false;
-                    if (selectedAction === 'PATIO' && (log.acao === 'ENTRADA' || log.acao === 'SAIDA')) return false;
 
                     if (selectedOrigin !== 'TODAS' && log.origem !== selectedOrigin) return false;
 
@@ -613,20 +610,30 @@
                 URL.revokeObjectURL(url);
             });
 
-            // ── Sincronização Multi-Camada (LocalStorage + BroadcastChannel + Servidor Local + Firebase) ──
+            // ── Sincronização Multi-Camada (LocalStorage + BroadcastChannel + Servidor Local + Firebase + Cloud Script) ──
             const LOGS_STORAGE_KEY = 'dniz_runway_logs';
+            const CLOUD_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzX0NsWNtFM2EfPgc2zYpWeoByt3xgjyyGsDLeB9Brt11HAULCzfCe95_ORPlHWATO2xQ/exec';
+            let isSyncingCloud = false;
 
             function mergeLogs(incomingList) {
                 const map = new Map();
                 allLogs.forEach(item => {
                     if (!item || typeof item !== 'object') return;
+                    if (item.acao !== 'ENTRADA' && item.acao !== 'SAIDA') return;
                     const key = item.id || `${item.timestamp}_${item.veiculo}_${item.acao}`;
                     map.set(key, { ...item, id: key });
                 });
                 incomingList.forEach(item => {
                     if (!item || typeof item !== 'object') return;
+                    if (item.acao !== 'ENTRADA' && item.acao !== 'SAIDA') return;
                     const key = item.id || `${item.timestamp}_${item.veiculo}_${item.acao}`;
-                    map.set(key, { ...item, id: key });
+                    const existing = map.get(key);
+                    map.set(key, {
+                        ...(existing || {}),
+                        ...item,
+                        id: key,
+                        _cloudSynced: !!(existing?._cloudSynced || item._cloudSynced)
+                    });
                 });
                 allLogs = Array.from(map.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
                 try {
@@ -634,6 +641,80 @@
                 } catch {}
                 populateVehicleDropdown(allLogs);
                 applyFilters();
+            }
+
+            async function pushLogToCloudScript(logEntry) {
+                try {
+                    const cleanPayload = {
+                        id: logEntry.id,
+                        timestamp: logEntry.timestamp,
+                        dataHora: logEntry.dataHora,
+                        dataHoraBR: logEntry.dataHoraBR,
+                        veiculo: logEntry.veiculo,
+                        acao: logEntry.acao,
+                        origem: logEntry.origem,
+                        duracaoSegundos: logEntry.duracaoSegundos,
+                        duracaoFormatada: logEntry.duracaoFormatada,
+                        anotacao: logEntry.anotacao,
+                        mensagem: logEntry.mensagem
+                    };
+                    const cloudMessage = `${logEntry.mensagem || ''} ||JSON||${JSON.stringify(cleanPayload)}`;
+                    const resp = await fetch(CLOUD_SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ message: cloudMessage })
+                    });
+                    if (resp.ok) {
+                        mergeLogs([{ ...logEntry, _cloudSynced: true }]);
+                    }
+                } catch (err) {
+                    console.warn('Aviso ao sincronizar log local com a nuvem:', err);
+                }
+            }
+
+            async function syncWithCloudScript() {
+                if (isSyncingCloud) return;
+                isSyncingCloud = true;
+                try {
+                    const resp = await fetch(`${CLOUD_SCRIPT_URL}?t=${Date.now()}`, { cache: 'no-store' });
+                    if (resp.ok) {
+                        const result = await resp.json();
+                        const cloudIds = new Set();
+                        if (result && Array.isArray(result.data)) {
+                            const parsedLogs = [];
+                            result.data.forEach(row => {
+                                const ev = String(row.Evento || '');
+                                if (ev.includes('||JSON||')) {
+                                    try {
+                                        const jsonStr = ev.split('||JSON||')[1];
+                                        const obj = JSON.parse(jsonStr);
+                                        if (obj && (obj.acao === 'ENTRADA' || obj.acao === 'SAIDA')) {
+                                            cloudIds.add(obj.id);
+                                            parsedLogs.push({ ...obj, _cloudSynced: true });
+                                        }
+                                    } catch {}
+                                }
+                            });
+                            if (parsedLogs.length > 0) {
+                                mergeLogs(parsedLogs);
+                            }
+                        }
+
+                        // Se este computador tiver logs locais ainda não enviados à nuvem, envia agora
+                        const unsynced = allLogs.filter(l =>
+                            (l.acao === 'ENTRADA' || l.acao === 'SAIDA') &&
+                            !l._cloudSynced &&
+                            !cloudIds.has(l.id)
+                        );
+                        for (const item of unsynced) {
+                            await pushLogToCloudScript(item);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Aviso ao buscar logs da nuvem:', err);
+                } finally {
+                    isSyncingCloud = false;
+                }
             }
 
             // 1. Carrega imediatamente do localStorage (0ms)
@@ -677,11 +758,11 @@
                     .catch(() => {});
             }
 
-            // 4. Listener em Tempo Real do Firebase (/logs e fallback /vehicles/_logs)
+            // 4. Listener em Tempo Real do Firebase (/logs, /vehicles/_logs e /vehicles/_historico)
             database.ref('logs').on('value', (snapshot) => {
                 const raw = snapshot.val();
                 if (raw) {
-                    const list = Object.entries(raw).map(([id, item]) => ({ id, ...item }));
+                    const list = Object.entries(raw).map(([id, item]) => ({ id, ...item, _cloudSynced: true }));
                     mergeLogs(list);
                 }
             });
@@ -689,10 +770,26 @@
             database.ref('vehicles/_logs').on('value', (snapshot) => {
                 const raw = snapshot.val();
                 if (raw) {
-                    const list = Object.entries(raw).map(([id, item]) => ({ id, ...item }));
+                    const list = Object.entries(raw).map(([id, item]) => ({ id, ...item, _cloudSynced: true }));
                     mergeLogs(list);
                 }
             });
+
+            database.ref('vehicles/_historico').on('value', (snapshot) => {
+                const raw = snapshot.val();
+                if (typeof raw === 'string') {
+                    try {
+                        const list = JSON.parse(raw);
+                        if (Array.isArray(list)) {
+                            mergeLogs(list.map(x => ({ ...x, _cloudSynced: true })));
+                        }
+                    } catch {}
+                }
+            });
+
+            // 5. Sincronização universal na nuvem (Cloud Script) para garantir soma entre todos os computadores
+            syncWithCloudScript();
+            setInterval(syncWithCloudScript, 10000);
         });
     </script>
 </body>
