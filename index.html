@@ -1581,7 +1581,11 @@
                     <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>
                     <span id="notam-modal-title">NOTAMs Ativos — SBIZ</span>
                 </h3>
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" onclick="window.toggleSimulateAdClsd()" id="simulate-ad-clsd-btn" class="metar-mini-btn" style="padding: 6px 12px; font-size: 0.8rem;" title="Simular um NOTAM de fechamento de pista (AD CLSD) em vigor agora">
+                        <i class="fas fa-ban" style="color: #f43f5e;"></i>
+                        <span>Simular AD CLSD</span>
+                    </button>
                     <button type="button" onclick="window.copyAllNotamsText()" id="copy-all-notams-btn" class="metar-mini-btn" style="padding: 6px 12px; font-size: 0.8rem;">
                         <i class="far fa-copy" style="color: #f59e0b;"></i>
                         <span>Copiar Todos</span>
@@ -2578,24 +2582,88 @@
             }
 
 
+            function updateRunwayClosureOverlay(activeClosureNotams = []) {
+                layer.find('.runway-closure-overlay').forEach(node => node.destroy());
+                if (!runwayPerimeter || !activeClosureNotams || activeClosureNotams.length === 0) return;
+
+                const notamNums = activeClosureNotams.map(it => it.n || 'NOTAM').join(', ');
+                const labelTxt = `PISTA FECHADA — NOTAM ${notamNums} (AD CLSD)`;
+
+                const overlayGroup = new Konva.Group({
+                    name: 'runway-closure-overlay',
+                    listening: false
+                });
+
+                const bannerText = new Konva.Text({
+                    text: labelTxt,
+                    fontSize: 16,
+                    fontStyle: 'bold',
+                    fontFamily: 'JetBrains Mono, Inter, sans-serif',
+                    fill: '#ffffff',
+                    padding: 10,
+                    align: 'center',
+                    listening: false
+                });
+
+                const boxW = Math.min(runwayPerimeter.width() - 16, Math.max(300, bannerText.width() + 24));
+                const boxH = 38;
+                const boxX = runwayPerimeter.x() + (runwayPerimeter.width() - boxW) / 2;
+                const boxY = Math.max(8, runwayPerimeter.y() - boxH - 8);
+
+                bannerText.width(boxW);
+                bannerText.x(boxX);
+                bannerText.y(boxY + 2);
+
+                const bannerBg = new Konva.Rect({
+                    x: boxX,
+                    y: boxY,
+                    width: boxW,
+                    height: boxH,
+                    fill: 'rgba(220, 38, 38, 0.92)',
+                    stroke: '#fca5a5',
+                    strokeWidth: 2,
+                    cornerRadius: 8,
+                    shadowColor: 'rgba(0,0,0,0.45)',
+                    shadowBlur: 10,
+                    listening: false
+                });
+
+                overlayGroup.add(bannerBg, bannerText);
+                layer.add(overlayGroup);
+            }
+
             function updateAlarmStatus() {
                 const isOccupied = layer.find('Group').some(group => group.attrs.isCurrentlyInside);
-                
-                if (isOccupied) {
+                const activeClosureNotams = (typeof getActiveClosureNotams === 'function') ? getActiveClosureNotams() : [];
+                const isClosedByNotam = activeClosureNotams.length > 0;
+                const hasRunwayAlert = isOccupied || isClosedByNotam;
+
+                if (isClosedByNotam) {
+                    const notamNums = activeClosureNotams.map(it => it.n || 'S/N').join(', ');
+                    const occSuffix = isOccupied ? ' • Pista Ocupada!' : '';
+                    alarmDisplay.innerHTML = `<i class="fas fa-ban"></i> Pista Fechada — NOTAM ${notamNums} (AD CLSD)${occSuffix}`;
+                    alarmDisplay.classList.add('active');
+                    runwayPerimeter?.stroke('#ef4444');
+                    perimeterAlarmTween?.play();
+                } else if (isOccupied) {
                     alarmDisplay.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Pista Ocupada!';
                     alarmDisplay.classList.add('active');
+                    runwayPerimeter?.stroke('#ef4444');
                     perimeterAlarmTween?.play();
                 } else {
                     alarmDisplay.innerHTML = '<i class="fas fa-check-circle"></i> Pista Livre';
                     alarmDisplay.classList.remove('active');
+                    runwayPerimeter?.stroke('#3b82f6');
                     perimeterAlarmTween?.pause();
                     perimeterAlarmTween?.seek(0);
                     runwayPerimeter?.fill('transparent');
                 }
 
+                updateRunwayClosureOverlay(activeClosureNotams);
+
                 if (alarmLightIcon) {
-                    alarmLightIcon.visible(isOccupied);
-                    isOccupied ? alarmLightTween?.play() : alarmLightTween?.pause();
+                    alarmLightIcon.visible(hasRunwayAlert);
+                    hasRunwayAlert ? alarmLightTween?.play() : alarmLightTween?.pause();
                 }
                 
                 updateIconNumbers();
@@ -3647,6 +3715,28 @@
                 };
             }
 
+            // Detecta se um NOTAM é de fechamento de pista / aeródromo (AD CLSD / RWY ... CLSD)
+            function isClosureNotam(notam) {
+                if (!notam) return false;
+                const textE = (notam.e || '').toUpperCase();
+                const codeQ = (notam.cod || '').toUpperCase();
+                if (/\bAD\s+CLSD\b/.test(textE)) return true;
+                if (/\bRWY(?:\s+\d{2}[LRC]?(?:\/\d{2}[LRC]?)?)?\s+CLSD\b/.test(textE)) return true;
+                if (/\bAERODROMO\s+FECHADO\b|\bPISTA\s+(?:\d{2}(?:\/\d{2})?\s+)?FECHADA\b/.test(textE)) return true;
+                if (codeQ === 'QMRLC' || codeQ === 'QFALC') return true;
+                return false;
+            }
+
+            // Retorna os NOTAMs de fechamento (AD CLSD / RWY CLSD) que estão EM VIGOR AGORA (dentro da janela D ou 24h)
+            function getActiveClosureNotams(now = new Date()) {
+                const items = Array.isArray(notamState.items) ? notamState.items : [];
+                return items.filter(it => {
+                    if (!isClosureNotam(it)) return false;
+                    const winMeta = evaluateNotamDailyWindow(it, now);
+                    return winMeta.state === 'active_now' || winMeta.state === 'continuous';
+                });
+            }
+
             function renderNotamCarousel() {
                 const stripEl = document.getElementById('notam-topbar-strip');
                 const inlineViewport = document.getElementById('notam-inline-viewport');
@@ -3671,6 +3761,7 @@
                     if (drawerViewport) {
                         drawerViewport.innerHTML = `<div style="font-size: 0.82rem; color: var(--text-muted); text-align: center; padding: 8px 0;">Nenhum NOTAM ativo para ${NOTAM_ICAO} na AISWEB.</div>`;
                     }
+                    updateAlarmStatus();
                     return;
                 }
 
@@ -3766,6 +3857,8 @@
                         return `<button type="button" onclick="window.goToNotamSlide(${idx})" style="height: 6px; width: ${w}; border-radius: 999px; background: ${bg}; border: none; cursor: pointer; transition: all 0.25s;" title="${it.n}: ${itMeta.label}"></button>`;
                     }).join('');
                 }
+
+                updateAlarmStatus();
             }
 
             function formatNotamForCopy(it) {
@@ -3960,12 +4053,64 @@
                 }
             };
 
+            window.toggleSimulateAdClsd = function() {
+                const simId = 'SIM_AD_CLSD_SBIZ';
+                const existingIdx = notamState.items.findIndex(it => it.id === simId);
+                const btn = document.getElementById('simulate-ad-clsd-btn');
+
+                if (existingIdx !== -1) {
+                    notamState.items.splice(existingIdx, 1);
+                    if (notamState.currentIndex >= notamState.items.length) notamState.currentIndex = 0;
+                    if (btn) {
+                        btn.innerHTML = `<i class="fas fa-ban" style="color: #f43f5e;"></i><span>Simular AD CLSD</span>`;
+                    }
+                } else {
+                    const now = new Date();
+                    const startD = new Date(now.getTime() - 30 * 60 * 1000);
+                    const endD = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+                    const fmtCode = d => {
+                        const yy = String(d.getUTCFullYear()).slice(-2);
+                        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getUTCDate()).padStart(2, '0');
+                        const hh = String(d.getUTCHours()).padStart(2, '0');
+                        const mi = String(d.getUTCMinutes()).padStart(2, '0');
+                        return `${yy}${mm}${dd}${hh}${mi}`;
+                    };
+                    const pad2 = n => String(n).padStart(2, '0');
+                    const dWindow = `${pad2(startD.getUTCHours())}${pad2(startD.getUTCMinutes())}-${pad2(endD.getUTCHours())}${pad2(endD.getUTCMinutes())}`;
+
+                    notamState.items.unshift({
+                        id: simId,
+                        n: 'G9999/26',
+                        tp: 'N',
+                        cat: 'AD',
+                        cod: 'QMRLC',
+                        status: 'ACTIVE',
+                        loc: NOTAM_ICAO,
+                        b: fmtCode(startD),
+                        c: fmtCode(endD),
+                        d: dWindow,
+                        e: 'AD CLSD WIP MANUTENCAO DE PISTA RWY 07/25 (SIMULACAO DE TESTE)'
+                    });
+                    notamState.currentIndex = 0;
+                    if (btn) {
+                        btn.innerHTML = `<i class="fas fa-undo" style="color: #10b981;"></i><span>Encerrar Simulação AD CLSD</span>`;
+                    }
+                }
+                renderNotamCarousel();
+                renderNotamModalList();
+            };
+
             function initNotamMonitor() {
                 loadCachedNotamsImmediately();
                 window.consultarNotam();
                 startNotamSlideTimer();
                 if (notamState.refreshTimer) clearInterval(notamState.refreshTimer);
                 notamState.refreshTimer = setInterval(() => window.consultarNotam(), 5 * 60 * 1000);
+                // Reavalia a cada 15 segundos se algum NOTAM de fechamento (AD CLSD) entrou ou saiu da janela de horário (D)
+                setInterval(() => {
+                    updateAlarmStatus();
+                }, 15000);
             }
 
             // Initialize everything in the right order
